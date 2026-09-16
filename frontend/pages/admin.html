@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>System Administrator — LegalMetro Comply</title>
+  <link rel="stylesheet" href="../css/styles.css" />
+  <script>window.__ENV__ = { SUPABASE_URL: "%VITE_SUPABASE_URL%", SUPABASE_ANON_KEY: "%VITE_SUPABASE_ANON_KEY%", API_BASE_URL: "%VITE_API_BASE_URL%" };</script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    .section { display: none; }
+    .section.active { display: block; }
+    .table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .table th { padding: 10px 14px; text-align: left; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--parchment); }
+    .table td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .table tr:last-child td { border-bottom: none; }
+    .table tbody tr:hover { background: var(--navy-50); }
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; font-family: var(--font-mono); }
+    .badge-compliant { background: var(--compliant-bg); color: var(--compliant); }
+    .badge-violation { background: var(--violation-bg); color: var(--violation); }
+    .badge-warning   { background: var(--warning-bg);   color: var(--warning); }
+    .badge-navy      { background: var(--navy-100);     color: var(--navy-800); }
+    .badge-amber     { background: var(--amber-100);    color: var(--amber-700); }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; backdrop-filter: blur(4px); align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--bg-card); border-radius: var(--radius-xl); padding: 28px; width: 480px; max-width: 95vw; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .modal-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+    .modal-close { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--parchment-dark); cursor: pointer; border: none; font-size: 16px; color: var(--text-muted); }
+    .modal-close:hover { background: var(--border); }
+    .rule-coverage { display: flex; flex-direction: column; gap: 10px; }
+    .rule-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--parchment); border-radius: var(--radius-sm); }
+    .rule-code { font-family: var(--font-mono); font-size: 12px; font-weight: 600; width: 120px; flex-shrink: 0; }
+    .rule-desc { flex: 1; font-size: 12px; color: var(--text-muted); }
+    .rule-status { flex-shrink: 0; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .status-dot.operational { background: #34d399; }
+    .status-dot.warning { background: #f59e0b; }
+    .status-dot.error { background: #dc2626; }
+    .log-line { font-family: var(--font-mono); font-size: 12px; padding: 6px 12px; border-radius: 4px; margin-bottom: 4px; line-height: 1.5; }
+    .log-line.info  { background: var(--navy-50); color: var(--navy-800); }
+    .log-line.warn  { background: var(--amber-50); color: var(--amber-700); }
+    .log-line.error { background: var(--violation-bg); color: var(--violation); }
+    .log-line.success { background: var(--compliant-bg); color: var(--compliant); }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 960px) { .two-col { grid-template-columns: 1fr; } }
+    .pagination { display: flex; align-items: center; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--border); justify-content: flex-end; }
+    .page-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); font-size: 12px; cursor: pointer; }
+    .page-btn.active { background: var(--navy-900); color: #fff; border-color: var(--navy-900); }
+    .greeting-banner { background: linear-gradient(135deg, var(--navy-900) 0%, var(--navy-800) 100%); border-radius: var(--radius-lg); padding: 24px 28px; color: #fff; margin-bottom: 24px; position: relative; overflow: hidden; }
+    .greeting-banner::before { content: ''; position: absolute; right: -20px; top: -20px; width: 140px; height: 140px; background: rgba(255,255,255,0.04); border-radius: 50%; }
+    .greeting-title { font-family: var(--font-display); font-size: 22px; font-weight: 600; }
+    .greeting-sub { font-size: 13px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+    .system-metric { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .system-metric:last-child { border-bottom: none; }
+    .settings-group { margin-bottom: 28px; }
+    .settings-group-title { font-family: var(--font-display); font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text-base); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- ── Sidebar ─────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M10 2L3 6v4c0 4 3.5 7.5 7 8.5C17.5 17.5 17 14 17 10V6l-7-4z" fill="white" opacity=".9"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sidebar-brand-name">LegalMetro</div>
+        <div class="sidebar-brand-sub">COMPLY v2.1</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Administration</span>
+      <button class="nav-item active" data-page="dashboard" onclick="showSection('dashboard', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><rect x="2" y="2" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4"/><rect x="10" y="2" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="10" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4"/><rect x="10" y="10" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" data-page="users" onclick="showSection('users', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><circle cx="7" cy="6" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M1 16c0-3.3 2.7-6 6-6"/><circle cx="13" cy="13" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M13 11v2l1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        User Management
+      </button>
+      <button class="nav-item" data-page="rules" onclick="showSection('rules', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><path d="M3 3h12v3H3zM3 9h9M3 14h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="14" cy="13" r="2.5" stroke="currentColor" stroke-width="1.2"/></svg>
+        Rule Engine
+      </button>
+      <button class="nav-item" data-page="logs" onclick="showSection('logs', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><path d="M3 4h12M3 9h12M3 14h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        System Logs
+      </button>
+      <button class="nav-item" data-page="settings" onclick="showSection('settings', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><circle cx="9" cy="9" r="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M9 2v1.5M9 14.5V16M2 9h1.5M14.5 9H16M4.1 4.1l1.1 1.1M12.8 12.8l1.1 1.1M4.1 13.9l1.1-1.1M12.8 5.2l1.1-1.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Settings
+      </button>
+      <button class="nav-item" data-page="profile" onclick="showSection('profile', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><circle cx="9" cy="6" r="3.5" stroke="currentColor" stroke-width="1.4"/><path d="M2 16c0-3.314 3.134-6 7-6s7 2.686 7 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        My Profile
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="nav-item" onclick="logout()" style="margin-bottom:10px;">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><path d="M12 12l4-4-4-4M16 9H7M10 3H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Log Out
+      </button>
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sidebar-avatar">SA</div>
+        <div>
+          <div class="sidebar-user-name" id="sidebar-user-name">Loading…</div>
+          <div class="sidebar-user-role" id="sidebar-user-role">Administrator</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ───────────────────────────── -->
+  <main class="main-content">
+    <div class="page-header">
+      <h1 class="page-title" id="page-title">System Administrator</h1>
+      <p class="page-subtitle" id="page-subtitle">Manage users, rules, and system configuration</p>
+    </div>
+
+    <div class="page-body">
+
+      <!-- Dashboard Section -->
+      <div id="section-dashboard" class="section active">
+        <div class="greeting-banner">
+          <div class="greeting-title" id="greeting-text">Good morning, Administrator</div>
+          <div class="greeting-sub" id="greeting-date">Loading…</div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-card" style="--stat-accent: var(--navy-600)">
+            <div class="stat-value" id="stat-total-users">23</div>
+            <div class="stat-label">Total Users</div>
+            <div class="stat-delta up">2 added this week</div>
+          </div>
+          <div class="stat-card" style="--stat-accent: var(--amber-600)">
+            <div class="stat-value" id="stat-active-inspectors">18</div>
+            <div class="stat-label">Active Inspectors</div>
+            <div class="stat-delta up">All zones covered</div>
+          </div>
+          <div class="stat-card" style="--stat-accent: var(--compliant)">
+            <div class="stat-value" id="stat-supervisors">3</div>
+            <div class="stat-label">Supervisors</div>
+            <div class="stat-delta up">Nodal officers active</div>
+          </div>
+          <div class="stat-card" style="--stat-accent: #34d399">
+            <div class="stat-value" id="stat-system-status" style="font-size:22px;">✓ OK</div>
+            <div class="stat-label">System Status</div>
+            <div class="stat-delta up">Operational</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><span class="card-title">System Health</span></div>
+            <div class="card-body" id="system-health">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">User Role Distribution</span></div>
+            <div class="card-body" id="role-distribution">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header">
+            <span class="card-title">Recent User Registrations</span>
+            <button class="btn btn-amber btn-sm" onclick="showSection('users', document.querySelector('[data-page=users]'))">Manage Users →</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="table">
+              <thead>
+                <tr><th>User ID</th><th>Name</th><th>Role</th><th>State</th><th>Status</th><th>Joined</th></tr>
+              </thead>
+              <tbody id="recent-users-body">
+                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Management Section -->
+      <div id="section-users" class="section">
+        <div style="display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
+          <button class="btn btn-amber" onclick="openCreateUserModal()">+ Create User</button>
+          <input class="form-input" style="width:200px;padding:8px 12px;font-size:12px;" placeholder="Search users…" oninput="filterUsers(this.value)" />
+          <select class="form-input" style="width:150px;padding:8px 12px;font-size:12px;" onchange="filterUsersByRole(this.value)">
+            <option value="">All Roles</option>
+            <option>inspector</option>
+            <option>supervisor</option>
+            <option>admin</option>
+            <option>manufacturer</option>
+            <option>consumer</option>
+          </select>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">All Users</span>
+            <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);" id="user-count">23 total</span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="table">
+              <thead>
+                <tr><th>User ID</th><th>Name</th><th>Role</th><th>State</th><th>Email</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="users-body">
+                <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination">
+            <span style="font-size:12px;color:var(--text-muted);">Showing 3 of 23</span>
+            <button class="page-btn active">1</button>
+            <button class="page-btn">2</button>
+            <button class="page-btn">›</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rule Engine Section -->
+      <div id="section-rules" class="section">
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header">
+            <span class="card-title">LM (PC) Rules 2011 — Coverage Status</span>
+            <span class="badge badge-compliant">42 / 42 Rules Active</span>
+          </div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+              All rules from the Legal Metrology (Packaged Commodities) Rules, 2011 as amended are loaded and enforced by the AI scanner engine.
+            </p>
+            <div class="rule-coverage" id="rule-coverage">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><span class="card-title">AI Model Status</span></div>
+            <div class="card-body">
+              <div class="system-metric"><span>Model Version</span><span class="badge badge-navy font-mono">lm-comply-v2.1</span></div>
+              <div class="system-metric"><span>Accuracy (Last 30d)</span><span style="font-family:var(--font-mono);font-weight:600;color:var(--compliant);">94.3%</span></div>
+              <div class="system-metric"><span>Avg Processing Time</span><span style="font-family:var(--font-mono);">1.8s</span></div>
+              <div class="system-metric"><span>Total Scans Processed</span><span style="font-family:var(--font-mono);">2,847</span></div>
+              <div class="system-metric"><span>False Positive Rate</span><span style="font-family:var(--font-mono);">2.1%</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Rule Engine Config</span></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Critical Threshold Score</label>
+                <input class="form-input" type="number" value="40" min="0" max="100" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Major Threshold Score</label>
+                <input class="form-input" type="number" value="65" min="0" max="100" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Auto-flag Products Below</label>
+                <input class="form-input" type="number" value="50" min="0" max="100" />
+              </div>
+              <button class="btn btn-primary" onclick="showToast('Configuration saved.', 'success')">Save Configuration</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Logs Section -->
+      <div id="section-logs" class="section">
+        <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+          <select class="form-input" style="width:140px;padding:8px 12px;font-size:12px;">
+            <option>All Levels</option><option>INFO</option><option>WARNING</option><option>ERROR</option>
+          </select>
+          <input type="date" class="form-input" style="width:160px;padding:8px 12px;font-size:12px;" />
+          <button class="btn btn-outline btn-sm" onclick="loadLogs()">↻ Refresh</button>
+          <button class="btn btn-ghost btn-sm" onclick="showToast('Exporting logs…','info')">↓ Export</button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">System Event Log</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);" id="log-time">Last updated: just now</span>
+          </div>
+          <div class="card-body" id="system-logs" style="max-height:500px;overflow-y:auto;">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Section -->
+      <div id="section-settings" class="section">
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Application Settings</span></div>
+            <div class="card-body">
+              <div class="settings-group">
+                <div class="settings-group-title">Platform</div>
+                <div class="form-group">
+                  <label class="form-label">App Name</label>
+                  <input class="form-input" type="text" value="LegalMetro Comply" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">API Base URL</label>
+                  <input class="form-input" type="text" value="https://legalmetro-api.onrender.com" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Environment</label>
+                  <select class="form-input">
+                    <option>Production</option>
+                    <option>Staging</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-group">
+                <div class="settings-group-title">Notifications</div>
+                <div class="form-group">
+                  <label class="form-label">Alert Email</label>
+                  <input class="form-input" type="email" placeholder="admin@doca.gov.in" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Critical Violation Alerts</label>
+                  <select class="form-input">
+                    <option>Immediate</option>
+                    <option>Hourly Digest</option>
+                    <option>Daily Digest</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn btn-amber" onclick="showToast('Settings saved successfully.', 'success')">Save Settings</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Supabase / Database</span></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Supabase Project URL</label>
+                <input class="form-input" type="text" placeholder="https://xxx.supabase.co" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Anon Key</label>
+                <input class="form-input" type="password" placeholder="eyJ…" />
+              </div>
+              <button class="btn btn-outline" style="margin-bottom:12px;" onclick="showToast('Testing connection…','info');setTimeout(()=>showToast('Connection OK!','success'),1200)">Test Connection</button>
+              <div style="margin-top:16px;">
+                <div class="settings-group-title">Backup & Restore</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="btn btn-outline btn-sm" onclick="showToast('Starting backup…','info')">Manual Backup</button>
+                  <button class="btn btn-ghost btn-sm" onclick="showToast('Contact your database administrator to restore from backup.','info')">Restore</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile Section -->
+      <div id="section-profile" class="section">
+        <div style="max-width:640px;">
+          <div class="card">
+            <div class="card-header" style="display:flex;align-items:center;gap:16px;">
+              <div id="profile-avatar-lg" style="width:56px;height:56px;border-radius:50%;background:var(--navy-900);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:22px;font-weight:700;flex-shrink:0;">SA</div>
+              <div>
+                <div id="profile-name-display" style="font-family:var(--font-display);font-size:20px;font-weight:600;">Loading…</div>
+                <div id="profile-role-display" style="font-size:13px;color:var(--text-muted);margin-top:2px;">System Administrator</div>
+              </div>
+            </div>
+            <div class="card-body">
+              <div id="profile-fields-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Create User Modal -->
+<div class="modal-overlay" id="create-user-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Create New User</span>
+      <button class="modal-close" onclick="closeCreateUserModal()">✕</button>
+    </div>
+    <form onsubmit="submitCreateUser(event)">
+      <div class="form-group">
+        <label class="form-label">User ID</label>
+        <input class="form-input" id="new-user-id" type="text" placeholder="e.g. rajesh.agarwal" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input class="form-input" id="new-user-name" type="text" placeholder="Rajesh Agarwal" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-input" id="new-user-role" required onchange="onRoleChange(this)">
+          <option value="">Select role…</option>
+          <option value="inspector">Inspector</option>
+          <option value="supervisor">Supervisor</option>
+          <option value="admin">Admin</option>
+          <option value="manufacturer">Manufacturer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">State / Zone</label>
+        <select class="form-input" id="create-state">
+          <option>Delhi</option><option>Maharashtra</option><option>Karnataka</option>
+          <option>Tamil Nadu</option><option>Gujarat</option><option>Uttar Pradesh</option>
+          <option>West Bengal</option><option>Rajasthan</option><option>Kerala</option>
+        </select>
+        <div id="state-auto-note" style="display:none;font-size:12px;color:var(--text-muted);margin-top:4px;">State is automatically assigned from your admin account.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Official Email</label>
+        <input class="form-input" id="new-user-email" type="email" placeholder="user@doca.gov.in" required />
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
+        <button type="button" class="btn btn-ghost" onclick="closeCreateUserModal()">Cancel</button>
+        <button type="submit" class="btn btn-amber">Create User</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+  function getRoleDisplay(role) {
+    const map = { inspector: 'Enforcement Officer', supervisor: 'Supervisor', admin: 'Administrator', manufacturer: 'Manufacturer', consumer: 'Consumer' };
+    return map[role] || role;
+  }
+
+  function showSection(id, navEl) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('section-' + id)?.classList.add('active');
+    navEl?.classList.add('active');
+    const titles = { dashboard: 'System Administrator', users: 'User Management', rules: 'Rule Engine', logs: 'System Logs', settings: 'Settings', profile: 'My Profile' };
+    document.getElementById('page-title').textContent = titles[id] || 'Administrator';
+    if (id === 'logs') loadLogs();
+    if (id === 'rules') loadRules();
+    if (id === 'users') loadUsers();
+    if (id === 'profile') loadProfile();
+  }
+
+  function loadProfile() {
+    const session = getSession();
+    if (!session) return;
+    const name = session.name || session.userId || 'Admin';
+    const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    document.getElementById('profile-avatar-lg').textContent = initials;
+    document.getElementById('profile-name-display').textContent = name;
+    document.getElementById('profile-role-display').textContent = 'System Administrator · ' + (session.userId || '');
+    const fields = [
+      { label: 'Admin ID', value: session.userId || '—' },
+      { label: 'Role', value: 'System Administrator' },
+      { label: 'State', value: session.state || '—' },
+      { label: 'Organization', value: session.organization || 'Department of Consumer Affairs' },
+      { label: 'Designation', value: session.designation || 'System Administrator' },
+      { label: 'Email', value: session.email || session.userId + '@doca.gov.in' },
+    ];
+    document.getElementById('profile-fields-grid').innerHTML = fields.map(f => `
+      <div style="background:var(--parchment);border-radius:8px;padding:12px 14px;">
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">${f.label}</div>
+        <div style="font-size:14px;font-weight:500;margin-top:4px;word-break:break-all;">${f.value}</div>
+      </div>
+    `).join('');
+  }
+
+  function openCreateUserModal()  { document.getElementById('create-user-modal').classList.add('open'); }
+  function closeCreateUserModal() { document.getElementById('create-user-modal').classList.remove('open'); }
+
+  function onRoleChange(sel) {
+    const autoRoles = ['inspector', 'supervisor'];
+    const stateField = document.getElementById('create-state');
+    const note = document.getElementById('state-auto-note');
+    if (autoRoles.includes(sel.value)) {
+      if (stateField) { stateField.disabled = true; stateField.value = ''; }
+      if (note) note.style.display = 'block';
+    } else {
+      if (stateField) stateField.disabled = false;
+      if (note) note.style.display = 'none';
+    }
+  }
+
+  async function submitCreateUser(e) {
+    e.preventDefault();
+    const body = {
+      user_id: document.getElementById('new-user-id').value,
+      name: document.getElementById('new-user-name').value,
+      role: document.getElementById('new-user-role').value,
+      state: document.getElementById('create-state').value,
+      email: document.getElementById('new-user-email').value,
+    };
+    try {
+      await API.createUser(body);
+      showToast('User created successfully!', 'success');
+      closeCreateUserModal();
+      loadUsers();
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  }
+
+  const roleBadge = r => {
+    const map = { admin: 'badge-violation', inspector: 'badge-navy', supervisor: 'badge-amber', manufacturer: 'badge-warning', consumer: 'badge-compliant' };
+    return `<span class="badge ${map[r]||'badge-navy'}" style="text-transform:capitalize;">${r}</span>`;
+  };
+
+  async function loadUsers() {
+    const tbody = document.getElementById('users-body');
+    const rbody = document.getElementById('recent-users-body');
+    try {
+      const data = await API.getUsers();
+      const rows = (data.items || []).map(u => `
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px;">${u.user_id}</td>
+          <td style="font-weight:500;">${u.name}</td>
+          <td>${roleBadge(u.role)}</td>
+          <td>${u.state}</td>
+          <td style="font-size:12px;color:var(--text-muted);">${u.email}</td>
+          <td><span class="badge ${u.is_active ? 'badge-compliant' : 'badge-violation'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+          <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">${u.created_at}</td>
+          <td>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-ghost btn-sm" onclick="showToast('Edit user: ${u.name}','info')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="confirmDisable('${u.id}', '${u.user_id}')">Disable</button>
+            </div>
+          </td>
+        </tr>`
+      );
+      if (tbody) tbody.innerHTML = rows.join('');
+      if (rbody) rbody.innerHTML = (data.items || []).slice(0, 3).map(u => `
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px;">${u.user_id}</td>
+          <td style="font-weight:500;">${u.name}</td>
+          <td>${roleBadge(u.role)}</td>
+          <td>${u.state}</td>
+          <td><span class="badge ${u.is_active ? 'badge-compliant' : 'badge-violation'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+          <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">${u.created_at}</td>
+        </tr>`
+      ).join('');
+    } catch(e) { if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">Could not load users.</td></tr>'; }
+  }
+
+  function filterUsers(q) {
+    document.querySelectorAll('#users-body tr').forEach(r =>
+      r.style.display = r.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none'
+    );
+  }
+  function filterUsersByRole(role) {
+    document.querySelectorAll('#users-body tr').forEach(r =>
+      r.style.display = (!role || r.textContent.toLowerCase().includes(role)) ? '' : 'none'
+    );
+  }
+  async function confirmDisable(id, userId) {
+    if (confirm('Disable user ' + userId + '? They will lose access immediately.')) {
+      try {
+        await API.updateUser(id, { is_active: false });
+        showToast('User ' + userId + ' disabled.', 'success');
+        loadUsers();
+      } catch (err) { showToast('Error: ' + err.message, 'error'); }
+    }
+  }
+
+  function loadRules() {
+    const RULES = [
+      { code: 'LMPC-R4', desc: 'Declaration of name and address of manufacturer', status: 'active' },
+      { code: 'LMPC-R5', desc: 'Common commodity names and net quantity', status: 'active' },
+      { code: 'LMPC-R6', desc: 'MRP, country of origin, consumer care number', status: 'active' },
+      { code: 'LMPC-R7', desc: 'Net quantity in standard metric units', status: 'active' },
+      { code: 'LMPC-R8', desc: 'Month and year of manufacture / best before', status: 'active' },
+      { code: 'LMPC-R9', desc: 'Batch/lot identification number', status: 'active' },
+      { code: 'LMPC-R26', desc: 'Retail pack of food articles (FSSAI cross-reference)', status: 'active' },
+      { code: 'LMPC-R34', desc: 'Declaration of quantity in grams / millilitres', status: 'active' },
+    ];
+    document.getElementById('rule-coverage').innerHTML = RULES.map(r => `
+      <div class="rule-row">
+        <div class="rule-code">${r.code}</div>
+        <div class="rule-desc">${r.desc}</div>
+        <div class="rule-status">
+          <span class="badge badge-compliant">
+            <span class="status-dot operational"></span>Active
+          </span>
+        </div>
+      </div>`
+    ).join('');
+  }
+
+  const SAMPLE_LOGS = [
+    { level: 'success', time: '10:42:31', msg: 'User priya.sharma logged in from 10.0.1.24 (Maharashtra zone)' },
+    { level: 'info',    time: '10:41:05', msg: 'Scan sc_a7f2b1 completed — score: 72 — 3 violations detected' },
+    { level: 'info',    time: '10:38:22', msg: 'Report r_monthly_jan2025 generated (PDF, 2.4 MB)' },
+    { level: 'warn',    time: '10:35:14', msg: 'API response time high: /api/scan/image returned in 4.2s (threshold: 3s)' },
+    { level: 'info',    time: '10:30:00', msg: 'Scheduled backup completed — 384 products, 2847 scans, 47 reports' },
+    { level: 'success', time: '10:18:47', msg: 'New user m.farooq created with role=inspector, state=Tamil Nadu' },
+    { level: 'error',   time: '09:55:33', msg: 'Supabase auth error: token expired for session sess_x84k2 — user redirected to login' },
+    { level: 'info',    time: '09:40:12', msg: 'Rule engine reloaded — 42 rules active, LM(PC) Rules 2011 v4.2' },
+    { level: 'warn',    time: '09:22:08', msg: 'Storage bucket label-images nearing 80% capacity (4.1 GB / 5 GB)' },
+    { level: 'info',    time: '09:00:00', msg: 'System startup complete — all services operational' },
+  ];
+
+  function loadLogs() {
+    document.getElementById('system-logs').innerHTML = SAMPLE_LOGS.map(l =>
+      `<div class="log-line ${l.level === 'success' ? 'success' : l.level}">
+        <span style="opacity:.5;">[${l.time}]</span> <strong>[${l.level.toUpperCase()}]</strong> ${l.msg}
+      </div>`
+    ).join('');
+    document.getElementById('log-time').textContent = 'Last updated: ' + getIST() + ' IST';
+  }
+
+  function loadDashboard() {
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    document.getElementById('greeting-text').textContent = getGreeting() + ', Administrator';
+    document.getElementById('greeting-date').textContent = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ' · IST ' + getIST();
+
+    const health = document.getElementById('system-health');
+    const metrics = [
+      { label: 'API Server', value: 'Operational', ok: true },
+      { label: 'Database', value: 'Supabase (Connected)', ok: true },
+      { label: 'AI Scan Engine', value: 'Online · v2.1', ok: true },
+      { label: 'Storage', value: '4.1 GB / 5 GB', ok: false },
+      { label: 'Last Backup', value: '10:30 IST today', ok: true },
+      { label: 'Uptime', value: '99.8% (30d)', ok: true },
+    ];
+    health.innerHTML = metrics.map(m => `
+      <div class="system-metric">
+        <span>${m.label}</span>
+        <span style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;">
+          <span class="status-dot ${m.ok ? 'operational' : 'warning'}"></span>${m.value}
+        </span>
+      </div>`
+    ).join('');
+
+    const rd = document.getElementById('role-distribution');
+    const roles = [{ role: 'Inspectors', count: 18, pct: 78 }, { role: 'Supervisors', count: 3, pct: 13 }, { role: 'Admins', count: 1, pct: 4 }, { role: 'Manufacturers', count: 1, pct: 4 }];
+    rd.innerHTML = roles.map(r => `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+          <span>${r.role}</span>
+          <span style="font-family:var(--font-mono);">${r.count}</span>
+        </div>
+        <div style="height:8px;background:var(--parchment-dark);border-radius:4px;overflow:hidden;">
+          <div style="height:100%;width:${r.pct}%;background:var(--navy-600);border-radius:4px;"></div>
+        </div>
+      </div>`
+    ).join('');
+
+    loadUsers();
+  }
+
+  // ── Bootstrap ─────────────────────────────────────
+  initTheme();
+  renderGlobalBar();
+  const session = requireAuth('admin');
+  if (session) {
+    const name = session.name || session.userId;
+    document.getElementById('sidebar-user-name').textContent = name;
+    document.getElementById('sidebar-user-role').textContent = getRoleDisplay(session.role);
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    document.getElementById('sidebar-avatar').textContent = initials;
+    loadDashboard();
+  }
+</script>
+</body>
+</html>

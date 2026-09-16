@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: legalmetro-api
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: apt-get update && apt-get install -y tesseract-ocr && pip install -r requirements.txt && python db/init_db.py
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: TESSERACT_CMD
+        value: /usr/bin/tesseract
+      - key: LABEL_BUCKET
+        value: label-images
+      - key: REPORTS_BUCKET
+        value: compliance-reports

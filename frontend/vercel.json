@@ -1,0 +1,19 @@
+{
+  "rewrites": [
+    { "source": "/inspector",    "destination": "/pages/inspector.html" },
+    { "source": "/supervisor",   "destination": "/pages/supervisor.html" },
+    { "source": "/admin",        "destination": "/pages/admin.html" },
+    { "source": "/manufacturer", "destination": "/pages/manufacturer.html" },
+    { "source": "/consumer",     "destination": "/pages/consumer.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options",        "value": "SAMEORIGIN" },
+        { "key": "X-Content-Type-Options",  "value": "nosniff" },
+        { "key": "Referrer-Policy",         "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ]
+}

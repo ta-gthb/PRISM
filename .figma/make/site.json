@@ -1,0 +1,10 @@
+{
+  "description": "Automates compliance checks of packaged commodity labels against Legal Metrology rules by scanning images to detect violations and generate reports.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
