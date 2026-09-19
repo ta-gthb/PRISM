@@ -251,6 +251,10 @@
           <div style="width:46px;height:46px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;background:#eef2ff;color:#6366f1" id="otp-step-icon"></div>
           <h3 class="font-display" style="font-size:20px;font-weight:600;margin-bottom:4px">Verify Your Mobile</h3>
           <p style="font-size:13px;color:var(--text-muted)">OTP sent to <span id="otp-mobile-display" style="font-family:var(--font-mono);font-weight:500;color:var(--text-base)"></span></p>
+          <div style="margin-top:10px;padding:6px 12px;background:var(--parchment);border:1px solid var(--border);border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px">
+            <span style="color:var(--amber-600)">🔑</span>
+            <span>Demo Mode: Enter OTP <strong style="font-family:var(--font-mono);font-size:13px;color:var(--navy-900);letter-spacing:0.06em">1234</strong></span>
+          </div>
         </div>
 
         <label class="form-label" style="text-align:center;display:block;margin-bottom:16px">Enter 4-digit OTP</label>
@@ -345,8 +349,8 @@ const ROLE_META = {
   admin:       { accent:'#ef4444', bg:'#fff1f2', flow:'password', note:'Credentials are set in the government database (NIC/DoCA IT Division).' },
   inspector:   { accent:'#d97706', bg:'#fffbeb', flow:'password', note:'User ID and password assigned by your System Administrator.' },
   supervisor:  { accent:'#0d9488', bg:'#f0fdfa', flow:'password', note:'User ID and password assigned by your System Administrator.' },
-  manufacturer:{ accent:'#6366f1', bg:'#eef2ff', flow:'otp',      note:'Login with your registered mobile number. New users are auto-registered.' },
-  consumer:    { accent:'#16a34a', bg:'#f0fdf4', flow:'otp',      note:'Login with your mobile number. First-time users are registered automatically.' },
+  manufacturer:{ accent:'#6366f1', bg:'#eef2ff', flow:'otp',      note:'Login with mobile number (Demo OTP: 1234). New users are auto-registered.' },
+  consumer:    { accent:'#16a34a', bg:'#f0fdf4', flow:'otp',      note:'Login with mobile number (Demo OTP: 1234). First-time users are registered automatically.' },
 };
 
 const ROLE_LABELS = {

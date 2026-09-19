@@ -75,6 +75,11 @@ async function requestOTP(mobile, state) {
 }
 
 async function verifyOTP(role, mobile, otp) {
+  const cleanOtp = String(otp || '').trim();
+  if (cleanOtp !== '1234') {
+    return { success: false, error: 'Invalid OTP. For demo mode, only OTP 1234 is allowed.' };
+  }
+
   const state = sessionStorage.getItem('pending_otp_state') || 'Delhi';
   let data = null;
   let isNew = false;
@@ -84,7 +89,7 @@ async function verifyOTP(role, mobile, otp) {
     try {
       const sb = initSupabase();
       const phone = `+91${mobile}`;
-      const res = await sb.auth.verifyOtp({ phone, token: otp, type: 'sms' });
+      const res = await sb.auth.verifyOtp({ phone, token: cleanOtp, type: 'sms' });
       if (!res.error && res.data && res.data.session) {
         data = res.data;
         try {
