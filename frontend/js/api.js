@@ -412,22 +412,26 @@ function setStore(key, data) {
 
 // ─── Network Request with Fallback ──────────────────────────────────
 async function apiRequest(method, path, body = null, isFormData = false) {
-  if (CONFIG.DEMO_MODE || !CONFIG.API_BASE_URL) {
-    return null; // Signals to use mock handler
+  if (CONFIG.DEMO_MODE) {
+    return null; // Signals to use local mock handler
   }
 
-  const url = `${CONFIG.API_BASE_URL}${path}`;
+  const url = CONFIG.API_BASE_URL ? `${CONFIG.API_BASE_URL}${path}` : path;
   const headers = { ...getAuthHeader() };
-  if (!isFormData) headers['Content-Type'] = 'application/json';
+  if (!isFormData && body && typeof body === 'object') {
+    headers['Content-Type'] = 'application/json';
+  }
 
   const opts = { method, headers };
-  if (body) opts.body = isFormData ? body : JSON.stringify(body);
+  if (body) {
+    opts.body = isFormData ? body : JSON.stringify(body);
+  }
 
   try {
     const res = await fetch(url, opts);
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new Error(err.detail || `HTTP ${res.status}`);
+      throw new Error(err.detail || err.error || `HTTP ${res.status}`);
     }
     return await res.json();
   } catch (err) {

@@ -8,14 +8,14 @@ function publicEnv(name, fallback) {
 }
 
 const CONFIG = {
-  // Demo mode: set to true to enable client mock data and demo credentials
-  DEMO_MODE: publicEnv('DEMO_MODE', 'true') === 'true',
+  // Demo mode: set to false to use live AI OCR scanning, statutory auditing, and dynamic reports
+  DEMO_MODE: publicEnv('DEMO_MODE', 'false') === 'true',
 
   // Supabase project settings (from https://app.supabase.com → Settings → API)
   SUPABASE_URL: publicEnv('SUPABASE_URL', ''),
   SUPABASE_ANON_KEY: publicEnv('SUPABASE_ANON_KEY', ''),
 
-  // FastAPI backend (Render Web Service URL)
+  // Backend API Base URL (empty uses current host /api/*)
   API_BASE_URL: publicEnv('API_BASE_URL', ''),
 
   // Supabase Storage bucket names
