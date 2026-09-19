@@ -16,7 +16,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: publicEnv('SUPABASE_ANON_KEY', ''),
 
   // Backend API Base URL (empty uses current host /api/*)
-  API_BASE_URL: publicEnv('API_BASE_URL', ''),
+  API_BASE_URL: '',
 
   // Supabase Storage bucket names
   BUCKETS: {

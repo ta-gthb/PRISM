@@ -201,23 +201,41 @@ function sendHtmlOrDownload(res, filename, content, mime = "text/html") {
   res.end(content);
 }
 
+function normalizeApiPath(rawUrl) {
+  try {
+    const urlObj = new URL(rawUrl || "/", "http://localhost:3000");
+    let pathname = urlObj.pathname || "/";
+    // Strip trailing slashes (except root "/")
+    if (pathname.length > 1 && pathname.endsWith("/")) {
+      pathname = pathname.slice(0, -1);
+    }
+    // Handle subpath prefixes like /pages/api/ or /frontend/api/
+    const apiIdx = pathname.indexOf("/api/");
+    if (apiIdx > 0) {
+      pathname = pathname.slice(apiIdx);
+    }
+    return { pathname, urlObj };
+  } catch {
+    return { pathname: rawUrl || "/", urlObj: new URL("/", "http://localhost:3000") };
+  }
+}
+
 function addApiRoutes(middlewares) {
   middlewares.use(async (req, res, next) => {
-    const urlObj = new URL(req.url || "/", "http://localhost:3000");
-    const pathname = urlObj.pathname;
-    const method = req.method;
+    const { pathname, urlObj } = normalizeApiPath(req.url);
+    const method = (req.method || "GET").toUpperCase();
 
     if (method === "OPTIONS") {
       res.writeHead(200, {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
       });
       return res.end();
     }
 
     // ── GET /health & /api/scan/health ─────────────────────────────────
-    if ((pathname === "/health" || pathname === "/api/scan/health" || pathname === "/api/health") && method === "GET") {
+    if ((pathname === "/health" || pathname === "/api/scan/health" || pathname === "/api/health" || pathname.endsWith("/api/health")) && method === "GET") {
       return sendJson(res, 200, {
         status: "ok",
         mode: "live-ai-audit",
@@ -228,7 +246,7 @@ function addApiRoutes(middlewares) {
     }
 
     // ── POST /api/scan/image ───────────────────────────────────────────
-    if (pathname === "/api/scan/image" && method === "POST") {
+    if ((pathname === "/api/scan/image" || pathname.endsWith("/api/scan/image")) && method === "POST") {
       try {
         const rawBuffer = await readBody(req);
         const contentType = req.headers["content-type"] || "";
@@ -357,7 +375,7 @@ function addApiRoutes(middlewares) {
     }
 
     // ── POST /api/scan/reevaluate ──────────────────────────────────────
-    if (pathname === "/api/scan/reevaluate" && method === "POST") {
+    if ((pathname === "/api/scan/reevaluate" || pathname.endsWith("/api/scan/reevaluate")) && method === "POST") {
       try {
         const rawBuffer = await readBody(req);
         const body = JSON.parse(rawBuffer.toString("utf-8"));
@@ -1062,6 +1080,14 @@ const ACTIVE_OTPS = new Map();
 
     if (pathname === "/api/auth/credentials" && method === "PUT") {
       return sendJson(res, 200, { message: "Credentials updated successfully." });
+    }
+
+    if (pathname.startsWith("/api/")) {
+      console.warn(`[PRISM API] Unmatched API path: ${method} ${pathname} (raw: ${req.url})`);
+      return sendJson(res, 404, {
+        error: `API route not found: ${method} ${pathname}`,
+        requested_url: req.url,
+      });
     }
 
     next();

@@ -837,38 +837,53 @@ const API = {
     let scanErrorMsg = "";
 
     // Call server Gemini AI Multimodal Vision & LM(PC)R statutory compliance endpoint
-    try {
-      const res = await fetch("/api/scan/image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image_base64: base64Data,
-          mime_type: mimeType,
-          file_name: fileName,
-          product_name: prodName,
-          brand: brandName,
-          location: location,
-          inspection_type: inspectionType,
-          category: category,
-          lot_reference: lotRef
-        })
-      });
+    const scanPayload = JSON.stringify({
+      image_base64: base64Data,
+      mime_type: mimeType,
+      file_name: fileName,
+      product_name: prodName,
+      brand: brandName,
+      location: location,
+      inspection_type: inspectionType,
+      category: category,
+      lot_reference: lotRef
+    });
 
-      if (res.ok) {
-        remoteScan = await res.json();
-        console.log("[PRISM API] Multimodal AI Vision extracted label information successfully:", remoteScan);
-      } else {
-        const errPayload = await res.json().catch(() => ({}));
-        scanErrorMsg = errPayload.error || errPayload.detail || `Server audit error (HTTP ${res.status})`;
-        console.warn("[PRISM API] Remote scan returned error:", res.status, scanErrorMsg);
+    const candidateUrls = [
+      "/api/scan/image",
+      `${window.location.origin}/api/scan/image`,
+      "../api/scan/image"
+    ];
+
+    let lastErrorMsg = "";
+    for (const url of candidateUrls) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: scanPayload
+        });
+
+        if (res.ok) {
+          remoteScan = await res.json();
+          console.log("[PRISM API] Multimodal AI Vision extracted label information successfully via " + url + ":", remoteScan);
+          break;
+        } else {
+          const errPayload = await res.json().catch(() => ({}));
+          lastErrorMsg = errPayload.error || errPayload.detail || `Server audit error (HTTP ${res.status})`;
+          if (res.status !== 404) {
+            break;
+          }
+          console.warn(`[PRISM API] ${url} returned 404, attempting path fallback...`);
+        }
+      } catch (err) {
+        lastErrorMsg = err.message || "Network error connecting to Vision Scanner.";
+        console.warn(`[PRISM API] Failed connecting to ${url}:`, err);
       }
-    } catch (err) {
-      scanErrorMsg = err.message || "Network error connecting to Vision Scanner.";
-      console.warn("[PRISM API] Server scan request failed:", err);
     }
 
     if (!remoteScan) {
-      throw new Error(scanErrorMsg || "The AI OCR scanner could not process this packaging image. Please verify your connection or upload a clearer photo.");
+      throw new Error(lastErrorMsg || "The AI OCR scanner could not process this packaging image. Please verify your connection or upload a clearer photo.");
     }
 
     const scanId = "scan-" + Date.now();
