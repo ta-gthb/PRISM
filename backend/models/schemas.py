@@ -250,7 +250,6 @@ class ScanResponse(BaseModel):
     product_name: Optional[str] = None
     brand: Optional[str] = None
     image_url: Optional[str] = None
-    input_type: Optional[str] = "physical_package"
     extracted_fields: Dict[str, Any] = {}
     compliance_result: ComplianceResult
     compliance_score: int = Field(..., ge=0, le=100)
@@ -272,7 +271,6 @@ class ScanListItem(BaseModel):
     product_name: Optional[str] = None
     brand: Optional[str] = None
     image_url: Optional[str] = None
-    input_type: Optional[str] = "physical_package"
     compliance_result: ComplianceResult
     compliance_score: int
     created_at: Optional[Union[datetime, str]] = None
