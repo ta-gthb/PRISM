@@ -216,7 +216,6 @@
         <div id="pwd-error" class="notice notice-error hidden" style="margin-bottom:12px"></div>
 
         <button class="btn btn-primary btn-full btn-lg" id="btn-signin" onclick="handlePasswordLogin()">Sign In</button>
-        <button type="button" class="btn btn-outline btn-full btn-sm" style="margin-top:10px;font-size:12px;opacity:0.9" onclick="quickFillPasswordDemo()">⚡ Auto-fill Demo Credentials</button>
       </div>
 
       <!-- ── STEP: Mobile OTP ── -->
@@ -237,13 +236,8 @@
           </div>
           <div id="mobile-error" class="form-error hidden"></div>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="inp-state">State / Union Territory</label>
-          <input class="form-input" id="inp-state" type="text" maxlength="100" placeholder="Enter your State or Union Territory" autocomplete="address-level1" />
-        </div>
 
         <button class="btn btn-primary btn-full btn-lg" id="btn-send-otp" onclick="handleSendOTP()">Send OTP</button>
-        <button type="button" class="btn btn-outline btn-full btn-sm" style="margin-top:10px;font-size:12px;opacity:0.9" onclick="quickFillMobileDemo()">⚡ Auto-fill Demo Mobile</button>
       </div>
 
       <!-- ── STEP: OTP verify ── -->
@@ -257,6 +251,10 @@
           <div style="width:46px;height:46px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;background:#eef2ff;color:#6366f1" id="otp-step-icon"></div>
           <h3 class="font-display" style="font-size:20px;font-weight:600;margin-bottom:4px">Verify Your Mobile</h3>
           <p style="font-size:13px;color:var(--text-muted)">OTP sent to <span id="otp-mobile-display" style="font-family:var(--font-mono);font-weight:500;color:var(--text-base)"></span></p>
+          <div style="margin-top:10px;padding:6px 12px;background:var(--parchment);border:1px solid var(--border);border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px">
+            <span style="color:var(--amber-600)">🔑</span>
+            <span>Demo Mode: Enter OTP <strong style="font-family:var(--font-mono);font-size:13px;color:var(--navy-900);letter-spacing:0.06em">1234</strong></span>
+          </div>
         </div>
 
         <label class="form-label" style="text-align:center;display:block;margin-bottom:16px">Enter 4-digit OTP</label>
@@ -270,13 +268,64 @@
         <div id="otp-error" class="notice notice-error hidden" style="margin-top:12px;justify-content:center"></div>
 
         <button class="btn btn-primary btn-full btn-lg" id="btn-verify-otp" onclick="handleVerifyOTP()" style="margin-top:20px" disabled>Verify &amp; Sign In</button>
-        <button type="button" class="btn btn-ghost btn-full btn-sm" style="margin-top:8px;font-size:12px;color:var(--navy-700)" onclick="quickFillOTPDemo()">Auto-fill Demo OTP (1234)</button>
 
         <p style="margin-top:16px;text-align:center;font-size:13px;color:var(--text-muted)">
           <span id="resend-timer">Resend OTP in <strong id="resend-countdown" style="font-family:var(--font-mono)">30</strong>s</span>
           <button id="btn-resend" onclick="handleSendOTP(true)" class="hidden" style="color:var(--navy-700);font-weight:500">Resend OTP</button>
         </p>
 
+      </div>
+
+      <!-- Step 5: Mandatory Manufacturer Registration (First-time auto register) -->
+      <div id="step-mfr-register" class="hidden">
+        <div style="margin-bottom:20px">
+          <div style="width:46px;height:46px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;background:#eef2ff;color:#6366f1">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5.5-4 10.5-8 12C8 22.5 4 17.5 4 12V6l8-4z" stroke="currentColor" stroke-width="1.8"/></svg>
+          </div>
+          <h3 class="font-display" style="font-size:20px;font-weight:600;margin-bottom:4px">Complete Manufacturer Registration</h3>
+          <p style="font-size:13px;color:var(--text-muted)">First-time registration: Enter your mandatory details under LM(PC)R 2011 to proceed to the portal.</p>
+        </div>
+
+        <!-- Auto-Generated User ID Announcement -->
+        <div style="background:var(--parchment);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:18px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:10px;font-family:var(--font-mono);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Auto-Generated User ID</div>
+              <div style="font-size:16px;font-family:var(--font-mono);font-weight:700;color:var(--navy-900);margin-top:2px;" id="reg-mfr-uid-display">MFR9120260001</div>
+            </div>
+            <span class="badge badge-compliant" style="font-size:11px;">Auto Assigned</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;" id="reg-mfr-phone-display">Registered Mobile: +91 </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label" for="inp-reg-mfr-name">Manufacturer Name <span style="color:#dc2626">*</span></label>
+          <input class="form-input" id="inp-reg-mfr-name" type="text" placeholder="Full name of manufacturer or authorized person" required />
+          <div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:3px;">Full name of the authorized proprietor / signatory</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label" for="inp-reg-mfr-company">Company Name <span style="color:#dc2626">*</span></label>
+          <input class="form-input" id="inp-reg-mfr-company" type="text" placeholder="Registered enterprise / firm / company name" required />
+          <div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:3px;">Legal entity name as registered under the Companies / GST Act</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label" for="inp-reg-mfr-gstin">GSTIN <span style="color:#dc2626">*</span></label>
+          <input class="form-input" id="inp-reg-mfr-gstin" type="text" placeholder="15-character GSTIN (e.g. 07AAAAA0000A1Z5)" maxlength="15" style="font-family:var(--font-mono);text-transform:uppercase;" required />
+          <div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:3px;">Format: 15 alphanumeric characters (e.g. 07AAAAA0000A1Z5)</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px">
+          <label class="form-label" for="inp-reg-mfr-state">State / Union Territory <span style="color:#dc2626">*</span></label>
+          <select class="form-input form-select" id="inp-reg-mfr-state" required>
+          </select>
+          <div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:3px;">Select State / Union Territory of registered establishment</div>
+        </div>
+
+        <div id="mfr-reg-error" class="notice notice-error hidden" style="margin-bottom:14px"></div>
+
+        <button class="btn btn-primary btn-full btn-lg" id="btn-submit-mfr-reg" onclick="handleSubmitManufacturerRegistration()">Complete Registration &amp; Proceed &rarr;</button>
       </div>
 
     </div><!-- /login-body -->
@@ -297,11 +346,11 @@ let currentRole = null;
 let countdownInterval = null;
 
 const ROLE_META = {
-  admin:       { accent:'#ef4444', bg:'#fff1f2', flow:'password', note:'Demo Credentials: User ID: admin / Password: Admin@2025' },
-  inspector:   { accent:'#d97706', bg:'#fffbeb', flow:'password', note:'Demo Credentials: User ID: rajesh.agarwal / Password: Insp@Delhi1' },
-  supervisor:  { accent:'#0d9488', bg:'#f0fdfa', flow:'password', note:'Demo Credentials: User ID: meera.krishnan / Password: Nodal@Zone1' },
-  manufacturer:{ accent:'#6366f1', bg:'#eef2ff', flow:'otp',      note:'Demo Credentials: Mobile: 9876543210 · State: Delhi · OTP: 1234' },
-  consumer:    { accent:'#16a34a', bg:'#f0fdf4', flow:'otp',      note:'Demo Credentials: Mobile: 9876543210 · State: Delhi · OTP: 1234' },
+  admin:       { accent:'#ef4444', bg:'#fff1f2', flow:'password', note:'Credentials are set in the government database (NIC/DoCA IT Division).' },
+  inspector:   { accent:'#d97706', bg:'#fffbeb', flow:'password', note:'User ID and password assigned by your System Administrator.' },
+  supervisor:  { accent:'#0d9488', bg:'#f0fdfa', flow:'password', note:'User ID and password assigned by your System Administrator.' },
+  manufacturer:{ accent:'#6366f1', bg:'#eef2ff', flow:'otp',      note:'Login with mobile number (Demo OTP: 1234). New users are auto-registered.' },
+  consumer:    { accent:'#16a34a', bg:'#f0fdf4', flow:'otp',      note:'Login with mobile number (Demo OTP: 1234). First-time users are registered automatically.' },
 };
 
 const ROLE_LABELS = {
@@ -314,13 +363,15 @@ const ROLE_SUBS = {
 };
 
 function showStep(step) {
-  ['role','password','mobile','otp'].forEach(s => {
-    document.getElementById('step-' + s).classList.toggle('hidden', s !== step);
+  ['role','password','mobile','otp','mfr-register'].forEach(s => {
+    const el = document.getElementById('step-' + s);
+    if (el) el.classList.toggle('hidden', s !== step);
   });
 }
 
 function selectRole(role) {
   currentRole = role;
+  sessionStorage.setItem('pending_otp_role', role);
   const meta = ROLE_META[role];
 
   // Set role badge in both password and OTP steps
@@ -365,34 +416,6 @@ function togglePwdVis() {
   inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
-function quickFillPasswordDemo() {
-  const creds = {
-    admin: { user: 'admin', pass: 'Admin@2025' },
-    inspector: { user: 'rajesh.agarwal', pass: 'Insp@Delhi1' },
-    supervisor: { user: 'meera.krishnan', pass: 'Nodal@Zone1' }
-  };
-  const c = creds[currentRole] || creds.admin;
-  document.getElementById('inp-userid').value = c.user;
-  document.getElementById('inp-password').value = c.pass;
-  document.getElementById('pwd-error')?.classList.add('hidden');
-}
-
-function quickFillMobileDemo() {
-  document.getElementById('inp-mobile').value = '9876543210';
-  document.getElementById('inp-state').value = 'Delhi (NCT)';
-  document.getElementById('mobile-error')?.classList.add('hidden');
-}
-
-function quickFillOTPDemo() {
-  const boxes = document.querySelectorAll('.otp-box');
-  const code = '1234';
-  boxes.forEach((box, i) => {
-    box.value = code[i] || '';
-  });
-  updateVerifyBtn();
-  document.getElementById('otp-error')?.classList.add('hidden');
-}
-
 async function handlePasswordLogin() {
   const userId = document.getElementById('inp-userid').value.trim();
   const password = document.getElementById('inp-password').value;
@@ -420,16 +443,15 @@ document.getElementById('inp-userid')?.addEventListener('keydown', e => { if (e.
 
 async function handleSendOTP(isResend = false) {
   const mobile = document.getElementById('inp-mobile').value.replace(/\D/g, '');
-  const state = document.getElementById('inp-state').value.trim();
   const errEl = document.getElementById('mobile-error');
   if (!isResend) {
     errEl.classList.add('hidden');
-    if (mobile.length !== 10 || !state) { errEl.textContent = 'Enter a valid mobile number and State / Union Territory.'; errEl.classList.remove('hidden'); return; }
+    if (mobile.length !== 10) { errEl.textContent = 'Please enter a valid 10-digit mobile number.'; errEl.classList.remove('hidden'); return; }
   }
 
   const btn = document.getElementById('btn-send-otp');
   if (btn) setLoading(btn, true, 'Sending…');
-  await requestOTP(mobile, state);
+  await requestOTP(mobile);
   if (btn) setLoading(btn, false, 'Send OTP');
 
   if (!isResend) {
@@ -469,12 +491,13 @@ function updateVerifyBtn() {
 async function handleVerifyOTP() {
   const otp = getOTPValue();
   const mobile = document.getElementById('inp-mobile').value.replace(/\D/g, '');
+  const role = currentRole || sessionStorage.getItem('pending_otp_role') || 'consumer';
   const errEl = document.getElementById('otp-error');
   const btn = document.getElementById('btn-verify-otp');
 
   errEl.classList.add('hidden');
   setLoading(btn, true, 'Verifying OTP...');
-  const result = await verifyOTP(currentRole, mobile, otp);
+  const result = await verifyOTP(role, mobile, otp);
   setLoading(btn, false, 'Verify & Sign In');
 
   if (!result.success) {
@@ -482,7 +505,90 @@ async function handleVerifyOTP() {
     errEl.classList.remove('hidden');
     return;
   }
-  window.location.href = `pages/${currentRole}.html`;
+
+  // Mandatory profile completion for Manufacturer on first-time login / auto register
+  if (role === 'manufacturer' && result.needsOnboarding) {
+    document.getElementById('reg-mfr-uid-display').textContent = result.userId || 'MFR91...';
+    document.getElementById('reg-mfr-phone-display').textContent = 'Registered Mobile: +91 ' + mobile;
+    const stateSel = document.getElementById('inp-reg-mfr-state');
+    if (stateSel) stateSel.innerHTML = renderStateOptionsHTML(result.state || 'Delhi');
+    showStep('mfr-register');
+    setTimeout(() => document.getElementById('inp-reg-mfr-name')?.focus(), 150);
+    return;
+  }
+
+  window.location.href = `pages/${role}.html`;
+}
+
+async function handleSubmitManufacturerRegistration() {
+  const name = document.getElementById('inp-reg-mfr-name').value.trim();
+  const company = document.getElementById('inp-reg-mfr-company').value.trim();
+  const gstin = document.getElementById('inp-reg-mfr-gstin').value.trim().toUpperCase();
+  const state = document.getElementById('inp-reg-mfr-state')?.value || 'Delhi';
+  const errEl = document.getElementById('mfr-reg-error');
+  const btn = document.getElementById('btn-submit-mfr-reg');
+
+  errEl.classList.add('hidden');
+
+  if (!name) {
+    errEl.textContent = 'Manufacturer Name is mandatory.';
+    errEl.classList.remove('hidden');
+    document.getElementById('inp-reg-mfr-name').focus();
+    return;
+  }
+  if (!company) {
+    errEl.textContent = 'Company Name is mandatory.';
+    errEl.classList.remove('hidden');
+    document.getElementById('inp-reg-mfr-company').focus();
+    return;
+  }
+  if (!gstin) {
+    errEl.textContent = 'GSTIN is mandatory.';
+    errEl.classList.remove('hidden');
+    document.getElementById('inp-reg-mfr-gstin').focus();
+    return;
+  }
+  const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+  if (!gstinRegex.test(gstin)) {
+    errEl.textContent = 'Invalid GSTIN format. Expected a 15-character GSTIN (e.g. 07AAAAA0000A1Z5).';
+    errEl.classList.remove('hidden');
+    document.getElementById('inp-reg-mfr-gstin').focus();
+    return;
+  }
+  if (!state) {
+    errEl.textContent = 'Please select a State / Union Territory.';
+    errEl.classList.remove('hidden');
+    document.getElementById('inp-reg-mfr-state')?.focus();
+    return;
+  }
+
+  setLoading(btn, true, 'Registering...');
+
+  try {
+    const session = getSession() || {};
+    const updated = await API.updateMe({
+      name: name,
+      organization: company,
+      gstin: gstin,
+      state: state,
+    });
+    const newSession = {
+      ...session,
+      ...updated,
+      name: name,
+      organization: company,
+      company_name: company,
+      gstin: gstin,
+      state: state,
+      needsOnboarding: false,
+    };
+    sessionStorage.setItem('lm_session', JSON.stringify(newSession));
+    window.location.href = 'pages/manufacturer.html';
+  } catch (err) {
+    errEl.textContent = err.message || 'Registration failed. Please check your inputs.';
+    errEl.classList.remove('hidden');
+    setLoading(btn, false, 'Complete Registration & Proceed →');
+  }
 }
 
 function startResendCountdown() {

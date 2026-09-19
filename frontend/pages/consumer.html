@@ -1111,6 +1111,10 @@ if (session) {
 
   loadDashboard();
   initNavActive('consumer');
+
+  if (session.isNew || session.is_new) {
+    showToast('Welcome! Your Consumer User ID is ' + uid + ' (auto-assigned).', 'success');
+  }
 }
 </script>
 </body>

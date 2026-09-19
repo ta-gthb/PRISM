@@ -1,5 +1,52 @@
 // ─── Utility Functions ──────────────────────────────────────────────
 
+const INDIAN_STATES = [
+  "Andaman and Nicobar Islands",
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chandigarh",
+  "Chhattisgarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jammu and Kashmir",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Ladakh",
+  "Lakshadweep",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Puducherry",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal"
+];
+
+function renderStateOptionsHTML(selectedState) {
+  const current = selectedState || 'Delhi';
+  return '<option value="">Select State / Union Territory</option>' + INDIAN_STATES.map(st => {
+    const isSel = (st.toLowerCase() === current.toLowerCase() || (st === 'Delhi' && current.toLowerCase().includes('delhi'))) ? 'selected' : '';
+    return `<option value="${st}" ${isSel}>${st}</option>`;
+  }).join('');
+}
+
 // IST clock
 function getIST() {
   const now = new Date();
@@ -84,6 +131,25 @@ function complianceBadge(status) {
   };
   const [cls, lbl] = map[status] || ['badge-navy', status];
   return `<span class="badge ${cls}">${lbl}</span>`;
+}
+
+// Inspection Input Mode badge HTML
+function inputModeBadge(inputType) {
+  const t = (inputType || 'physical_package').toLowerCase();
+  const map = {
+    physical_package: ['badge-physical', '📦 Physical Package'],
+    artwork_design:   ['badge-artwork',  '🎨 Packaging Artwork'],
+    ecommerce_listing:['badge-ecommerce','🛒 E-Commerce Listing'],
+  };
+  const [cls, lbl] = map[t] || ['badge-physical', '📦 Physical Package'];
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+
+function inputModeName(inputType) {
+  const t = (inputType || 'physical_package').toLowerCase();
+  if (t === 'artwork_design') return 'Packaging Artwork / Design File';
+  if (t === 'ecommerce_listing') return 'E-Commerce Product Listing';
+  return 'Physical Package Image';
 }
 
 // Score ring SVG

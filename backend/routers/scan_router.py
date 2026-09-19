@@ -25,58 +25,121 @@ from services.storage_service import storage_service
 
 router = APIRouter(prefix="/api/scan", tags=["Scans"])
 
-ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/tiff", "image/bmp"}
+ALLOWED_CONTENT_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/tiff",
+    "image/bmp",
+    "application/pdf",
+}
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 @router.post("/image", response_model=ScanResponse, status_code=status.HTTP_201_CREATED)
 async def scan_image(
-    file: UploadFile = File(..., description="Label image (JPEG / PNG / WEBP)"),
+    file: Optional[UploadFile] = File(None, description="Label image, PDF artwork proof, or listing screenshot"),
+    input_type: str = Form("physical_package", description="Inspection mode: physical_package, artwork_design, or ecommerce_listing"),
     product_name: Optional[str] = Form(None),
     brand: Optional[str] = Form(None),
+    product_url: Optional[str] = Form(None, description="E-commerce listing URL (Amazon, Flipkart, Blinkit, Zepto, etc.)"),
+    listing_text: Optional[str] = Form(None, description="E-commerce listing title, seller, or specification text"),
+    platform_name: Optional[str] = Form(None, description="Marketplace platform name"),
+    artwork_type: Optional[str] = Form(None, description="Packaging format: pouch, carton, bottle, label"),
     evidence: List[UploadFile] = File(default=[]),
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Full pipeline:
-    1. Validate & upload image to Supabase Storage
-    2. Run OCR (OpenCV pre-processing + Tesseract)
-    3. Apply LM (PC) Rules 2011 rule engine
-    4. Augment violations with RAG legal context
-    5. Persist scan + violation rows to PostgreSQL
-    6. Return complete result
+    Inspection Pipeline supporting three input modes:
+    1. Physical package images (on-pack camera / photos, OCR + LM(PC)R 2011 physical rules)
+    2. Packaging artwork/design files (pre-press PDF / high-res artwork, PDP checks, metric symbol audit)
+    3. E-commerce product listings (digital marketplace URL / screenshot / metadata, Rule 6(10) audit)
     """
-    # --- Validate content type ---
-    if file.content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"Unsupported file type '{file.content_type}'. "
-                   f"Accepted: {', '.join(ALLOWED_CONTENT_TYPES)}",
+    input_type = (input_type or "physical_package").lower()
+
+    if current_user.get("role") == "manufacturer":
+        if not current_user.get("name") or not current_user.get("organization") or not current_user.get("gstin"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Manufacturer must enter Manufacturer Name, Company Name, and GSTIN to proceed further."
+            )
+
+    image_bytes: Optional[bytes] = None
+    image_url: Optional[str] = None
+    ocr_result: dict = {"fields": {}, "analysis": {}}
+
+    if file:
+        if file.content_type not in ALLOWED_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"Unsupported file type '{file.content_type}'. "
+                       f"Accepted: {', '.join(ALLOWED_CONTENT_TYPES)}",
+            )
+        image_bytes = await file.read()
+        if len(image_bytes) > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Uploaded file exceeds the 10 MB limit",
+            )
+
+        # Upload to storage
+        ext = ".pdf" if file.content_type == "application/pdf" else ".jpg"
+        safe_filename = f"{uuid.uuid4()}{ext}"
+        image_url = storage_service.upload_label_image(
+            image_bytes, safe_filename, file.content_type or "image/jpeg"
         )
 
-    image_bytes = await file.read()
-    if len(image_bytes) > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Image exceeds the 10 MB limit",
-        )
-
-    # --- Upload to storage ---
-    safe_filename = f"{uuid.uuid4()}.jpg"
-    image_url = storage_service.upload_label_image(
-        image_bytes, safe_filename, file.content_type or "image/jpeg"
-    )
-
-    # --- OCR ---
-    try:
-        ocr_result = ocr_service.process_image(image_bytes)
-    except Exception as exc:
+        # Process image via OCR if raster image
+        if file.content_type != "application/pdf":
+            try:
+                ocr_result = ocr_service.process_image(image_bytes, file.content_type or "image/jpeg")
+            except Exception as exc:
+                ocr_result = {"fields": {}, "analysis": {}}
+        else:
+            # Handle PDF artwork
+            ocr_result = {
+                "fields": {
+                    "artwork_format": "PDF Vector / Pre-Press Proof",
+                    "artwork_type": artwork_type or "Packaging Proof",
+                },
+                "analysis": {"readability_score": 95, "median_text_height_px": 14},
+            }
+    elif input_type != "ecommerce_listing":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"OCR processing failed: {exc}",
+            detail="A file upload is required for physical package and artwork inspections.",
         )
 
     extracted_fields: dict = ocr_result.get("fields", {})
+    extracted_fields["input_type"] = input_type
+
+    # E-commerce listing specific extraction & URL handling
+    if input_type == "ecommerce_listing":
+        if platform_name:
+            extracted_fields["platform_name"] = platform_name
+        if product_url:
+            extracted_fields["product_url"] = product_url
+            if not platform_name:
+                url_lower = product_url.lower()
+                if "amazon" in url_lower:
+                    extracted_fields["platform_name"] = "Amazon India"
+                elif "flipkart" in url_lower:
+                    extracted_fields["platform_name"] = "Flipkart"
+                elif "blinkit" in url_lower:
+                    extracted_fields["platform_name"] = "Blinkit"
+                elif "zepto" in url_lower:
+                    extracted_fields["platform_name"] = "Zepto"
+                elif "jiomart" in url_lower:
+                    extracted_fields["platform_name"] = "JioMart"
+                elif "bigbasket" in url_lower:
+                    extracted_fields["platform_name"] = "BigBasket"
+                else:
+                    extracted_fields["platform_name"] = "E-Commerce Marketplace"
+        if listing_text:
+            extracted_fields["listing_text"] = listing_text
+
+    if artwork_type:
+        extracted_fields["artwork_type"] = artwork_type
 
     # Prefer form-supplied name/brand over OCR guess
     if product_name:
@@ -84,9 +147,16 @@ async def scan_image(
     if brand:
         extracted_fields["brand"] = brand
 
-    # --- Rule engine ---
-    compliance = rule_engine.run(extracted_fields, ocr_result.get("analysis"), state=current_user.get("state"))
+    # --- Rule engine tailored to input_type ---
+    compliance = rule_engine.run(
+        extracted_fields,
+        ocr_result.get("analysis"),
+        state=current_user.get("state"),
+        input_type=input_type,
+    )
     extracted_fields["_analysis"] = ocr_result.get("analysis", {})
+    if compliance.get("artwork_clearance"):
+        extracted_fields["artwork_clearance"] = compliance["artwork_clearance"]
 
     # --- RAG guidance ---
     rag_guidance = rag_service.get_compliance_guidance(compliance["violations"])

@@ -197,7 +197,14 @@ def create_user(body: UserCreate, current_user: dict = Depends(require_admin)):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        user_id = body.user_id or f"{body.role.value[:3].upper()}-{uuid.uuid4().hex[:10].upper()}"
+        if not body.user_id:
+            if body.role in (UserRole.manufacturer, UserRole.consumer):
+                from routers.auth_router import _next_public_id
+                user_id = _next_public_id(cur, body.role)
+            else:
+                user_id = f"{body.role.value[:3].upper()}-{uuid.uuid4().hex[:10].upper()}"
+        else:
+            user_id = body.user_id
 
         # Check if user with same user_id OR email already exists in users table
         cur.execute("SELECT id, user_id, email, is_active FROM users WHERE user_id = %s OR LOWER(email) = LOWER(%s)", (user_id, str(body.email).lower()))

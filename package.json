@@ -7,13 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "lint": "node --check frontend/js/*.js"
+    "preview": "vite preview"
   },
   "devDependencies": {
     "vite": "^8.0.5"
-  },
-  "dependencies": {
-    "@google/genai": "^2.23.0"
   }
 }

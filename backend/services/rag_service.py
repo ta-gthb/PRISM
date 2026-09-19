@@ -128,6 +128,25 @@ LEGAL_KB: List[Dict[str, str]] = [
             "the package being opened or perceptibly modified."
         ),
     },
+    {
+        "rule": "Rule 6(10)",
+        "text": (
+            "E-Commerce marketplace declarations: An e-commerce entity shall ensure that the mandatory declarations "
+            "prescribed under Rule 6(1) — including name and address of the manufacturer, packer, or importer, net quantity, "
+            "maximum retail price (MRP), country of origin, best before or expiry date, and consumer care details — are "
+            "displayed on the digital listing of the commodity. Failure to display these digital declarations is an offence "
+            "under the Legal Metrology Act, 2009 and Consumer Protection (E-Commerce) Rules, 2020."
+        ),
+    },
+    {
+        "rule": "Rule 9 / Pre-Press Artwork",
+        "text": (
+            "Packaging artwork design files: Pre-print proofs, dielines, and digital label layouts must satisfy the "
+            "proportional Principal Display Panel (PDP) area requirements, minimum font height mandates under the First Schedule, "
+            "color contrast ratios against substrate backgrounds, and standard metric unit symbols ('g', 'kg', 'ml', 'l') "
+            "prior to commercial printing and manufacturing."
+        ),
+    },
 ]
 
 
