@@ -924,16 +924,27 @@ function addApiRoutes(middlewares) {
         const rawBuffer = await readBody(req);
         const body = JSON.parse(rawBuffer.toString("utf-8"));
         const { user_id, password, role } = body;
+        const uLower = (user_id || "").trim().toLowerCase();
 
-        const user = LIVE_STORE.users.find(u => u.user_id.toLowerCase() === (user_id || "").toLowerCase());
-        const token = "prism_jwt_" + Buffer.from(JSON.stringify({ user_id, role, time: Date.now() })).toString("base64");
+        const user = LIVE_STORE.users.find(u => 
+          (u.user_id && u.user_id.toLowerCase() === uLower) || 
+          (u.email && u.email.toLowerCase() === uLower) ||
+          (uLower === 'admin' && u.role === 'admin')
+        );
+
+        const targetRole = role || (user ? user.role : "inspector");
+        const resolvedUserId = user ? user.user_id : (user_id || "officer");
+        const token = "prism_jwt_" + Buffer.from(JSON.stringify({ user_id: resolvedUserId, role: targetRole, time: Date.now() })).toString("base64");
 
         return sendJson(res, 200, {
           token,
-          user_id: user_id || "officer",
-          name: user ? user.name : (user_id ? user_id.charAt(0).toUpperCase() + user_id.slice(1) : "Enforcement Officer"),
-          role: role || (user ? user.role : "inspector"),
+          user_id: resolvedUserId,
+          name: user ? user.name : (resolvedUserId ? resolvedUserId.charAt(0).toUpperCase() + resolvedUserId.slice(1) : "Enforcement Officer"),
+          email: user ? user.email : `${resolvedUserId}@doca.gov.in`,
+          role: targetRole,
           state: user ? user.state : "Delhi",
+          organization: user ? user.organization : "Department of Consumer Affairs",
+          designation: user ? user.designation : (targetRole === 'admin' ? 'System Administrator' : targetRole === 'supervisor' ? 'Nodal Officer' : 'Field Inspector'),
           is_active: true
         });
       } catch (err) {
