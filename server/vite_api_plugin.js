@@ -130,10 +130,42 @@ const LIVE_STORE = {
     }
   ],
   users: [
-    { user_id: "rajesh.agarwal", name: "Rajesh Agarwal", role: "inspector", state: "Delhi", is_active: true, scans_count: 42 },
-    { user_id: "meera.krishnan", name: "Meera Krishnan", role: "supervisor", state: "Delhi", is_active: true, scans_count: 128 },
-    { user_id: "admin", name: "System Administrator", role: "admin", state: "Central", is_active: true, scans_count: 310 }
-  ]
+    { id: "u-1", user_id: "rajesh.agarwal", name: "Rajesh Agarwal", email: "rajesh.agarwal@doca.gov.in", role: "inspector", state: "Delhi", is_active: true, designation: "Enforcement Officer - Delhi Zone 1", organization: "Legal Metrology Enforcement Wing", scans_count: 42 },
+    { id: "u-2", user_id: "meera.krishnan", name: "Meera Krishnan", email: "meera.krishnan@doca.gov.in", role: "supervisor", state: "Delhi", is_active: true, designation: "Nodal Officer / Supervisor", organization: "Ministry of Consumer Affairs", scans_count: 128 },
+    { id: "u-3", user_id: "admin", name: "System Administrator", email: "admin@doca.gov.in", role: "admin", state: "Central", is_active: true, designation: "Director (Legal Metrology IT)", organization: "Department of Consumer Affairs (DoCA)", scans_count: 310 }
+  ],
+  cases: [
+    {
+      id: "case-901",
+      scan_id: "scan-20250218-002",
+      product_name: "Haldiram's Nagpur Aloo Bhujia 400g",
+      status: "open",
+      state: "Delhi",
+      notes: "Missing mandatory tax declaration on MRP.",
+      created_at: new Date(Date.now() - 3600000 * 20).toISOString(),
+      updated_at: new Date(Date.now() - 3600000 * 20).toISOString()
+    }
+  ],
+  audit_logs: [
+    {
+      id: "log-1",
+      action: "ENGINE_INITIALIZED",
+      user_id: "system",
+      resource: "LM(PC)R 2011 Compliance Engine",
+      details: { engine: "Gemini 3.8 Flash Vision", status: "operational" },
+      created_at: new Date().toISOString()
+    }
+  ],
+  thresholds: {
+    state: "Delhi",
+    thresholds: {
+      "LMPC-R4(1)": { tolerance_pct: 0, min_score: 90, active: true },
+      "LMPC-R6(1)": { tolerance_pct: 0, min_score: 95, active: true },
+      "LMPC-R7(1)": { tolerance_pct: 2, min_score: 85, active: true },
+      "LMPC-R6(6)": { tolerance_pct: 0, min_score: 80, active: true },
+      "LMPC-R2(l)": { tolerance_pct: 5, min_score: 75, active: true }
+    }
+  }
 };
 
 /**
@@ -719,12 +751,160 @@ function addApiRoutes(middlewares) {
       return sendHtmlOrDownload(res, `${repId}.html`, htmlDoc, "text/html");
     }
 
-    // ── GET /api/users ─────────────────────────────────────────────────
-    if (pathname === "/api/users" && method === "GET") {
+    // ── GET /api/scan/:id ─────────────────────────────────────────────
+    if (pathname.startsWith("/api/scan/") && !pathname.includes("/consumer-report") && method === "GET") {
+      const scanId = pathname.replace("/api/scan/", "");
+      const scan = LIVE_STORE.scans.find(s => s.id === scanId) || LIVE_STORE.scans[0];
+      return sendJson(res, 200, scan);
+    }
+
+    // ── POST /api/scan/:id/consumer-report ─────────────────────────────
+    if (pathname.includes("/consumer-report") && method === "POST") {
+      const parts = pathname.split("/");
+      const scanId = parts[3];
+      const scan = LIVE_STORE.scans.find(s => s.id === scanId);
+      const newCase = {
+        id: "case-" + Date.now(),
+        scan_id: scanId,
+        product_name: scan ? scan.product_name : "Reported Commodity",
+        status: "open",
+        state: "Delhi",
+        notes: "Consumer reported non-compliance for field inspection.",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      LIVE_STORE.cases.unshift(newCase);
+      return sendJson(res, 200, { message: "Report successfully submitted to Legal Metrology Department.", case_id: newCase.id });
+    }
+
+    // ── GET /api/products/:id ──────────────────────────────────────────
+    if (pathname.startsWith("/api/products/") && method === "GET") {
+      const pid = pathname.replace("/api/products/", "");
+      const product = LIVE_STORE.products.find(p => p.id === pid) || LIVE_STORE.products[0];
+      const relatedScans = LIVE_STORE.scans.filter(s => s.product_name === product.name);
+      return sendJson(res, 200, { ...product, recent_scans: relatedScans });
+    }
+
+    // ── Users CRUD & Audit Logs ────────────────────────────────────────
+    if (pathname === "/api/users/audit-logs" && method === "GET") {
       return sendJson(res, 200, {
-        items: LIVE_STORE.users,
-        total: LIVE_STORE.users.length
+        items: LIVE_STORE.audit_logs,
+        total: LIVE_STORE.audit_logs.length
       });
+    }
+
+    if (pathname === "/api/users" && method === "GET") {
+      const roleFilter = urlObj.searchParams.get("role");
+      const search = urlObj.searchParams.get("search");
+      let items = [...LIVE_STORE.users];
+      if (roleFilter) items = items.filter(u => u.role === roleFilter);
+      if (search) {
+        const s = search.toLowerCase();
+        items = items.filter(u => (u.name || "").toLowerCase().includes(s) || (u.user_id || "").toLowerCase().includes(s) || (u.state || "").toLowerCase().includes(s));
+      }
+      return sendJson(res, 200, {
+        items,
+        total: items.length
+      });
+    }
+
+    if (pathname === "/api/users" && method === "POST") {
+      try {
+        const rawBuffer = await readBody(req);
+        const body = JSON.parse(rawBuffer.toString("utf-8"));
+        const newUser = {
+          id: "u-" + Date.now(),
+          user_id: body.user_id || body.username || `emp.${Date.now().toString().slice(-4)}`,
+          name: body.name || `${body.first_name || ''} ${body.last_name || ''}`.trim() || "Officer",
+          email: body.email || `${body.user_id || 'officer'}@doca.gov.in`,
+          role: body.role || "inspector",
+          state: body.state || "Delhi",
+          designation: body.designation || (body.role === "supervisor" ? "Nodal Officer" : "Field Inspector"),
+          organization: body.organization || "Department of Consumer Affairs",
+          is_active: true,
+          scans_count: 0,
+          created_at: new Date().toISOString()
+        };
+        LIVE_STORE.users.push(newUser);
+        LIVE_STORE.audit_logs.unshift({
+          id: "log-" + Date.now(),
+          action: "USER_CREATED",
+          user_id: "admin",
+          resource: newUser.user_id,
+          details: { role: newUser.role, state: newUser.state },
+          created_at: new Date().toISOString()
+        });
+        return sendJson(res, 201, newUser);
+      } catch (err) {
+        return sendJson(res, 400, { error: err.message });
+      }
+    }
+
+    if (pathname.startsWith("/api/users/") && method === "PUT") {
+      try {
+        const uid = pathname.replace("/api/users/", "");
+        const rawBuffer = await readBody(req);
+        const body = JSON.parse(rawBuffer.toString("utf-8"));
+        const user = LIVE_STORE.users.find(u => u.id === uid || u.user_id === uid);
+        if (user) {
+          Object.assign(user, body);
+          return sendJson(res, 200, user);
+        }
+        return sendJson(res, 404, { error: "User not found" });
+      } catch (err) {
+        return sendJson(res, 400, { error: err.message });
+      }
+    }
+
+    if (pathname.startsWith("/api/users/") && method === "DELETE") {
+      const uid = pathname.replace("/api/users/", "");
+      LIVE_STORE.users = LIVE_STORE.users.filter(u => u.id !== uid && u.user_id !== uid);
+      return sendJson(res, 200, { message: "User deleted successfully" });
+    }
+
+    // ── Cases & Enforcement Tracking ───────────────────────────────────
+    if (pathname === "/api/cases" && method === "GET") {
+      return sendJson(res, 200, {
+        items: LIVE_STORE.cases,
+        total: LIVE_STORE.cases.length
+      });
+    }
+
+    if (pathname === "/api/cases" && method === "POST") {
+      try {
+        const rawBuffer = await readBody(req);
+        const body = JSON.parse(rawBuffer.toString("utf-8"));
+        const newCase = {
+          id: "case-" + Date.now(),
+          scan_id: body.scan_id || null,
+          product_name: body.product_name || "Inspection Sample",
+          status: body.status || "open",
+          state: body.state || "Delhi",
+          notes: body.notes || "",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        LIVE_STORE.cases.unshift(newCase);
+        return sendJson(res, 201, newCase);
+      } catch (err) {
+        return sendJson(res, 400, { error: err.message });
+      }
+    }
+
+    // ── Rule Thresholds ────────────────────────────────────────────────
+    if (pathname === "/api/rules/thresholds" && method === "GET") {
+      return sendJson(res, 200, LIVE_STORE.thresholds);
+    }
+
+    if (pathname === "/api/rules/thresholds" && method === "PUT") {
+      try {
+        const rawBuffer = await readBody(req);
+        const body = JSON.parse(rawBuffer.toString("utf-8"));
+        Object.assign(LIVE_STORE.thresholds, body);
+        return sendJson(res, 200, { message: "Thresholds updated successfully.", thresholds: LIVE_STORE.thresholds });
+      } catch (err) {
+        return sendJson(res, 400, { error: err.message });
+      }
     }
 
     // ── POST /api/auth/staff-login ─────────────────────────────────────
@@ -776,7 +956,7 @@ function addApiRoutes(middlewares) {
       }
     }
 
-    // ── GET /api/auth/me ───────────────────────────────────────────────
+    // ── GET & PUT /api/auth/me ──────────────────────────────────────────
     if (pathname === "/api/auth/me" && method === "GET") {
       return sendJson(res, 200, {
         user_id: "rajesh.agarwal",
@@ -785,6 +965,20 @@ function addApiRoutes(middlewares) {
         state: "Delhi",
         is_active: true
       });
+    }
+
+    if (pathname === "/api/auth/me" && method === "PUT") {
+      try {
+        const rawBuffer = await readBody(req);
+        const body = JSON.parse(rawBuffer.toString("utf-8"));
+        return sendJson(res, 200, { success: true, ...body });
+      } catch (err) {
+        return sendJson(res, 400, { error: err.message });
+      }
+    }
+
+    if (pathname === "/api/auth/credentials" && method === "PUT") {
+      return sendJson(res, 200, { message: "Credentials updated successfully." });
     }
 
     next();

@@ -216,7 +216,6 @@
         <div id="pwd-error" class="notice notice-error hidden" style="margin-bottom:12px"></div>
 
         <button class="btn btn-primary btn-full btn-lg" id="btn-signin" onclick="handlePasswordLogin()">Sign In</button>
-        <button type="button" class="btn btn-outline btn-full btn-sm" style="margin-top:10px;font-size:12px;opacity:0.9" onclick="quickFillPasswordDemo()">⚡ Auto-fill Demo Credentials</button>
       </div>
 
       <!-- ── STEP: Mobile OTP ── -->
@@ -243,7 +242,6 @@
         </div>
 
         <button class="btn btn-primary btn-full btn-lg" id="btn-send-otp" onclick="handleSendOTP()">Send OTP</button>
-        <button type="button" class="btn btn-outline btn-full btn-sm" style="margin-top:10px;font-size:12px;opacity:0.9" onclick="quickFillMobileDemo()">⚡ Auto-fill Demo Mobile</button>
       </div>
 
       <!-- ── STEP: OTP verify ── -->
@@ -270,7 +268,6 @@
         <div id="otp-error" class="notice notice-error hidden" style="margin-top:12px;justify-content:center"></div>
 
         <button class="btn btn-primary btn-full btn-lg" id="btn-verify-otp" onclick="handleVerifyOTP()" style="margin-top:20px" disabled>Verify &amp; Sign In</button>
-        <button type="button" class="btn btn-ghost btn-full btn-sm" style="margin-top:8px;font-size:12px;color:var(--navy-700)" onclick="quickFillOTPDemo()">Auto-fill Demo OTP (1234)</button>
 
         <p style="margin-top:16px;text-align:center;font-size:13px;color:var(--text-muted)">
           <span id="resend-timer">Resend OTP in <strong id="resend-countdown" style="font-family:var(--font-mono)">30</strong>s</span>
@@ -297,11 +294,11 @@ let currentRole = null;
 let countdownInterval = null;
 
 const ROLE_META = {
-  admin:       { accent:'#ef4444', bg:'#fff1f2', flow:'password', note:'Demo Credentials: User ID: admin / Password: Admin@2025' },
-  inspector:   { accent:'#d97706', bg:'#fffbeb', flow:'password', note:'Demo Credentials: User ID: rajesh.agarwal / Password: Insp@Delhi1' },
-  supervisor:  { accent:'#0d9488', bg:'#f0fdfa', flow:'password', note:'Demo Credentials: User ID: meera.krishnan / Password: Nodal@Zone1' },
-  manufacturer:{ accent:'#6366f1', bg:'#eef2ff', flow:'otp',      note:'Demo Credentials: Mobile: 9876543210 · State: Delhi · OTP: 1234' },
-  consumer:    { accent:'#16a34a', bg:'#f0fdf4', flow:'otp',      note:'Demo Credentials: Mobile: 9876543210 · State: Delhi · OTP: 1234' },
+  admin:       { accent:'#ef4444', bg:'#fff1f2', flow:'password', note:'Department IT Administrator Portal. Enter your official administrative credentials.' },
+  inspector:   { accent:'#d97706', bg:'#fffbeb', flow:'password', note:'Enforcement Officer Login. Use your registered Legal Metrology inspector ID.' },
+  supervisor:  { accent:'#0d9488', bg:'#f0fdfa', flow:'password', note:'Zonal / Ministry Supervisor Portal. Enter your supervisory account credentials.' },
+  manufacturer:{ accent:'#6366f1', bg:'#eef2ff', flow:'otp',      note:'Registered Packaged Commodity Manufacturer & Importer Self-Compliance Portal.' },
+  consumer:    { accent:'#16a34a', bg:'#f0fdf4', flow:'otp',      note:'Citizen Packaging Verification Portal. Sign in using your mobile number.' },
 };
 
 const ROLE_LABELS = {
@@ -363,34 +360,6 @@ function getRoleIcon(role) {
 function togglePwdVis() {
   const inp = document.getElementById('inp-password');
   inp.type = inp.type === 'password' ? 'text' : 'password';
-}
-
-function quickFillPasswordDemo() {
-  const creds = {
-    admin: { user: 'admin', pass: 'Admin@2025' },
-    inspector: { user: 'rajesh.agarwal', pass: 'Insp@Delhi1' },
-    supervisor: { user: 'meera.krishnan', pass: 'Nodal@Zone1' }
-  };
-  const c = creds[currentRole] || creds.admin;
-  document.getElementById('inp-userid').value = c.user;
-  document.getElementById('inp-password').value = c.pass;
-  document.getElementById('pwd-error')?.classList.add('hidden');
-}
-
-function quickFillMobileDemo() {
-  document.getElementById('inp-mobile').value = '9876543210';
-  document.getElementById('inp-state').value = 'Delhi (NCT)';
-  document.getElementById('mobile-error')?.classList.add('hidden');
-}
-
-function quickFillOTPDemo() {
-  const boxes = document.querySelectorAll('.otp-box');
-  const code = '1234';
-  boxes.forEach((box, i) => {
-    box.value = code[i] || '';
-  });
-  updateVerifyBtn();
-  document.getElementById('otp-error')?.classList.add('hidden');
 }
 
 async function handlePasswordLogin() {

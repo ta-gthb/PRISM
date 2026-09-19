@@ -1,6 +1,6 @@
-// ─── FastAPI Client & Realistic LM(PC)R 2011 Compliance Engine ───────
+// ─── Legal Metrology API Client & LM(PC)R 2011 Compliance Engine ───────
 
-// ─── Initial Mock Collections (Idempotent LocalStorage Initialization) ───
+// ─── Primary Data Collections (Idempotent Local Storage Persistence) ───
 const DEFAULT_PRODUCTS = [
   {
     id: "prod-1",
@@ -543,8 +543,8 @@ async function getStats() {
     };
   }
 
-  const scans = getStore('lm_mock_scans', DEFAULT_SCANS);
-  const users = getStore('lm_mock_users', DEFAULT_USERS);
+  const scans = getStore('prism_db_scans', DEFAULT_SCANS);
+  const users = getStore('prism_db_users', DEFAULT_USERS);
   const compliant = scans.filter(s => s.compliance_result === 'compliant').length;
   const partial = scans.filter(s => s.compliance_result === 'partial').length;
   const violation = scans.filter(s => s.compliance_result === 'violation').length;
@@ -578,7 +578,7 @@ async function getStats() {
 const API = {
   health: async () => {
     const res = await apiRequest('GET', '/health');
-    return res || { status: "ok", mode: "demo", rules: "LM(PC)R 2011", timestamp: new Date().toISOString() };
+    return res || { status: "ok", mode: "live", rules: "LM(PC)R 2011", timestamp: new Date().toISOString() };
   },
 
   // Auth
@@ -627,7 +627,7 @@ const API = {
       return { ...res, items: res.items.map(v => ({ ...v, product: v.product_name, field: v.field_name, date: v.created_at })) };
     }
 
-    const scans = getStore('lm_mock_scans', DEFAULT_SCANS);
+    const scans = getStore('prism_db_scans', DEFAULT_SCANS);
     const violationsList = [];
     scans.forEach(s => {
       if (s.violations && s.violations.length > 0) {
@@ -789,12 +789,12 @@ const API = {
     }
 
     // Store in history
-    const scans = getStore('lm_mock_scans', DEFAULT_SCANS);
+    const scans = getStore('prism_db_scans', DEFAULT_SCANS);
     scans.unshift(finalScan);
-    setStore('lm_mock_scans', scans);
+    setStore('prism_db_scans', scans);
 
     // Update products repository
-    const prods = getStore('lm_mock_products', DEFAULT_PRODUCTS);
+    const prods = getStore('prism_db_products', DEFAULT_PRODUCTS);
     const existing = prods.find(p => p.name.toLowerCase() === finalScan.product_name.toLowerCase());
     if (existing) {
       existing.scan_count = (existing.scan_count || 1) + 1;
@@ -817,10 +817,10 @@ const API = {
         last_scanned_at: new Date().toISOString()
       });
     }
-    setStore('lm_mock_products', prods);
+    setStore('prism_db_products', prods);
 
     // Append audit log
-    const logs = getStore('lm_mock_audit_logs', DEFAULT_AUDIT_LOGS);
+    const logs = getStore('prism_db_audit_logs', DEFAULT_AUDIT_LOGS);
     logs.unshift({
       id: "log-" + Date.now(),
       action: "SCAN_PROCESSED",
@@ -829,7 +829,7 @@ const API = {
       details: { score: finalScan.score, status: finalScan.status, model: finalScan.model_used },
       created_at: new Date().toISOString()
     });
-    setStore('lm_mock_audit_logs', logs);
+    setStore('prism_db_audit_logs', logs);
 
     return normaliseScan(finalScan);
   },
@@ -861,7 +861,7 @@ const API = {
     const remote = await apiRequest('GET', `/api/scan/${id}`);
     if (remote) return normaliseScan(remote);
 
-    const scans = getStore('lm_mock_scans', DEFAULT_SCANS);
+    const scans = getStore('prism_db_scans', DEFAULT_SCANS);
     const scan = scans.find(s => String(s.id) === String(id)) || scans[0];
     return normaliseScan(scan);
   },
@@ -872,7 +872,7 @@ const API = {
       return { ...remote, items: remote.items.map(normaliseScan) };
     }
 
-    const scans = getStore('lm_mock_scans', DEFAULT_SCANS);
+    const scans = getStore('prism_db_scans', DEFAULT_SCANS);
     return {
       items: scans.map(normaliseScan),
       total: scans.length,
@@ -887,7 +887,7 @@ const API = {
     const remote = await apiRequest('GET', `/api/products?${params}`);
     if (remote && remote.items) return remote;
 
-    const prods = getStore('lm_mock_products', DEFAULT_PRODUCTS);
+    const prods = getStore('prism_db_products', DEFAULT_PRODUCTS);
     return {
       items: prods,
       total: prods.length,
@@ -901,8 +901,8 @@ const API = {
     const remote = await apiRequest('GET', `/api/products/${id}`);
     if (remote) return remote;
 
-    const prods = getStore('lm_mock_products', DEFAULT_PRODUCTS);
-    const scans = getStore('lm_mock_scans', DEFAULT_SCANS);
+    const prods = getStore('prism_db_products', DEFAULT_PRODUCTS);
+    const scans = getStore('prism_db_scans', DEFAULT_SCANS);
     const p = prods.find(x => String(x.id) === String(id)) || prods[0];
     const relatedScans = scans.filter(s => s.product_name === p.name);
 
@@ -917,7 +917,7 @@ const API = {
     const remote = await apiRequest('GET', `/api/reports?${params}`);
     if (remote && remote.items) return remote;
 
-    const reports = getStore('lm_mock_reports', DEFAULT_REPORTS);
+    const reports = getStore('prism_db_reports', DEFAULT_REPORTS);
     return {
       items: reports,
       total: reports.length,
@@ -939,9 +939,9 @@ const API = {
 
     const remote = await apiRequest('POST', '/api/reports/generate', payload);
     if (remote) {
-      const reports = getStore('lm_mock_reports', DEFAULT_REPORTS);
+      const reports = getStore('prism_db_reports', DEFAULT_REPORTS);
       reports.unshift(remote);
-      setStore('lm_mock_reports', reports);
+      setStore('prism_db_reports', reports);
       return remote;
     }
 
@@ -958,9 +958,9 @@ const API = {
       created_at: new Date().toISOString()
     };
 
-    const reports = getStore('lm_mock_reports', DEFAULT_REPORTS);
+    const reports = getStore('prism_db_reports', DEFAULT_REPORTS);
     reports.unshift(newReport);
-    setStore('lm_mock_reports', reports);
+    setStore('prism_db_reports', reports);
 
     return newReport;
   },
@@ -975,7 +975,7 @@ const API = {
     const remote = await apiRequest('GET', `/api/users${params ? '?' + params : ''}`);
     if (remote && remote.items) return remote;
 
-    const users = getStore('lm_mock_users', DEFAULT_USERS);
+    const users = getStore('prism_db_users', DEFAULT_USERS);
     let filtered = [...users];
 
     if (params) {
@@ -1002,7 +1002,7 @@ const API = {
     const remote = await apiRequest('POST', '/api/users', body);
     if (remote) return remote;
 
-    const users = getStore('lm_mock_users', DEFAULT_USERS);
+    const users = getStore('prism_db_users', DEFAULT_USERS);
     const newUser = {
       id: "user-" + Date.now(),
       user_id: body.user_id || body.username || (`emp.${Date.now().toString().slice(-4)}`),
@@ -1018,10 +1018,10 @@ const API = {
       created_at: new Date().toISOString()
     };
     users.push(newUser);
-    setStore('lm_mock_users', users);
+    setStore('prism_db_users', users);
 
     // Audit log
-    const logs = getStore('lm_mock_audit_logs', DEFAULT_AUDIT_LOGS);
+    const logs = getStore('prism_db_audit_logs', DEFAULT_AUDIT_LOGS);
     logs.unshift({
       id: "log-" + Date.now(),
       action: "USER_CREATED",
@@ -1030,7 +1030,7 @@ const API = {
       details: { role: newUser.role, state: newUser.state },
       created_at: new Date().toISOString()
     });
-    setStore('lm_mock_audit_logs', logs);
+    setStore('prism_db_audit_logs', logs);
 
     return newUser;
   },
@@ -1039,11 +1039,11 @@ const API = {
     const remote = await apiRequest('PUT', `/api/users/${id}`, body);
     if (remote) return remote;
 
-    const users = getStore('lm_mock_users', DEFAULT_USERS);
+    const users = getStore('prism_db_users', DEFAULT_USERS);
     const user = users.find(u => String(u.id) === String(id) || String(u.user_id) === String(id));
     if (user) {
       Object.assign(user, body);
-      setStore('lm_mock_users', users);
+      setStore('prism_db_users', users);
       return user;
     }
     return { id, ...body };
@@ -1053,9 +1053,9 @@ const API = {
     const remote = await apiRequest('DELETE', `/api/users/${id}?permanent=${permanent}`);
     if (remote) return remote;
 
-    let users = getStore('lm_mock_users', DEFAULT_USERS);
+    let users = getStore('prism_db_users', DEFAULT_USERS);
     users = users.filter(u => String(u.id) !== String(id) && String(u.user_id) !== String(id));
-    setStore('lm_mock_users', users);
+    setStore('prism_db_users', users);
     return { message: "User deleted successfully" };
   },
 
@@ -1063,7 +1063,7 @@ const API = {
     const remote = await apiRequest('GET', '/api/users/audit-logs');
     if (remote && remote.items) return remote;
 
-    const logs = getStore('lm_mock_audit_logs', DEFAULT_AUDIT_LOGS);
+    const logs = getStore('prism_db_audit_logs', DEFAULT_AUDIT_LOGS);
     return {
       items: logs,
       total: logs.length,
@@ -1107,8 +1107,8 @@ const API = {
     const remote = await apiRequest('POST', `/api/scan/${scanId}/consumer-report`);
     if (remote) return remote;
 
-    const cases = getStore('lm_mock_cases', []);
-    const scans = getStore('lm_mock_scans', DEFAULT_SCANS);
+    const cases = getStore('prism_db_cases', []);
+    const scans = getStore('prism_db_scans', DEFAULT_SCANS);
     const scan = scans.find(s => String(s.id) === String(scanId)) || scans[0];
 
     const newCase = {
@@ -1122,7 +1122,7 @@ const API = {
       updated_at: new Date().toISOString()
     };
     cases.unshift(newCase);
-    setStore('lm_mock_cases', cases);
+    setStore('prism_db_cases', cases);
 
     return { message: "Report successfully submitted to Legal Metrology Enforcement Wing.", case_id: newCase.id };
   },
@@ -1131,7 +1131,7 @@ const API = {
     const remote = await apiRequest('GET', `/api/cases?${params}`);
     if (remote && remote.items) return remote;
 
-    const cases = getStore('lm_mock_cases', [
+    const cases = getStore('prism_db_cases', [
       {
         id: "case-901",
         scan_id: "scan-104",

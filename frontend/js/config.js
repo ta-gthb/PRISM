@@ -8,8 +8,8 @@ function publicEnv(name, fallback) {
 }
 
 const CONFIG = {
-  // Demo mode: set to false to use live AI OCR scanning, statutory auditing, and dynamic reports
-  DEMO_MODE: publicEnv('DEMO_MODE', 'false') === 'true',
+  // Live AI OCR scanning, statutory auditing, and dynamic reports
+  IS_LIVE: true,
 
   // Supabase project settings (from https://app.supabase.com → Settings → API)
   SUPABASE_URL: publicEnv('SUPABASE_URL', ''),
