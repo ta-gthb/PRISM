@@ -446,77 +446,194 @@ function normaliseScan(scan) {
   };
 }
 
+// Scale down high-resolution camera photos or large screenshots on client-side canvas to optimize OCR speed and prevent network dropouts
+async function optimizeImageForOcr(file) {
+  if (!(file instanceof Blob)) return null;
+  if (file.type === "image/svg+xml" || (file.name && file.name.endsWith(".svg"))) return null;
+
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 1800; // Optimal resolution for small legal metrology text & Gemini Vision
+        let width = img.width;
+        let height = img.height;
+        if (width <= MAX_DIM && height <= MAX_DIM && file.size < 1.5 * 1024 * 1024) {
+          const raw = e.target.result;
+          resolve(typeof raw === "string" ? (raw.split(",")[1] || "") : "");
+          return;
+        }
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.90);
+        resolve(dataUrl.split(",")[1] || "");
+      };
+      img.onerror = () => {
+        const raw = e.target.result;
+        resolve(typeof raw === "string" ? (raw.split(",")[1] || "") : "");
+      };
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
 // ─── Client Compliance Rule Checker ─────────────────────────────────
 function evaluateLabelCompliance(productName, brand, extraFields = {}) {
-  const name = (productName || extraFields.product_name || "Packaged Food Item").trim();
-  const bName = (brand || extraFields.brand || "Indian Brands").trim();
-  const lowerName = name.toLowerCase();
+  const name = (productName || extraFields.product_name || "").trim();
+  const bName = (brand || extraFields.brand || extraFields.brand_name || "").trim();
 
   const violations = [];
-  let score = 94;
+  let score = 100;
 
   const fields = {
-    product_name: name,
-    brand: bName,
-    mrp: extraFields.mrp || "₹ 165.00 (Incl. of all taxes)",
-    net_quantity: extraFields.net_quantity || "500 g",
-    mfr_date: extraFields.mfr_date || "02/2025",
-    exp_date: extraFields.exp_date || "02/2026",
-    batch_no: extraFields.batch_no || ("LOT-" + Math.floor(1000 + Math.random() * 9000)),
-    manufacturer_name: extraFields.manufacturer_name || `${bName} Products India Ltd., Plot 14, Sector 3, Industrial Estate, Noida - 201301`,
+    product_name: name || "Not Declared / Not Found",
+    brand: bName || "Not Declared / Not Found",
+    brand_name: bName || "Not Declared / Not Found",
+    mrp: extraFields.mrp || "Not Declared / Blank",
+    net_quantity: extraFields.net_quantity || "Not Declared / Blank",
+    unit_sale_price: extraFields.unit_sale_price || "Not Declared",
+    mfr_date: extraFields.mfr_date || extraFields.mfg_date || "Not Declared / Blank",
+    mfg_date: extraFields.mfr_date || extraFields.mfg_date || "Not Declared / Blank",
+    exp_date: extraFields.exp_date || extraFields.expiry_date || "Not Declared / Blank",
+    expiry_date: extraFields.exp_date || extraFields.expiry_date || "Not Declared / Blank",
+    batch_no: extraFields.batch_no || extraFields.batch_number || "Not Declared / Blank",
+    batch_number: extraFields.batch_no || extraFields.batch_number || "Not Declared / Blank",
+    manufacturer_name: extraFields.manufacturer_name || extraFields.manufacturer_details || "Not Declared / Blank",
+    manufacturer_details: extraFields.manufacturer_name || extraFields.manufacturer_details || "Not Declared / Blank",
     country_of_origin: extraFields.country_of_origin || "India",
-    customer_care: extraFields.customer_care || "Toll Free: 1800-200-1122, care@packagedgoods.in"
+    customer_care: extraFields.customer_care || extraFields.consumer_care || "Not Declared / Blank",
+    fssai_license: extraFields.fssai_license || "Not Declared / Not Found",
+    barcode: extraFields.barcode || "Not Declared / Not Found"
   };
 
-  // Rule simulation based on keyword triggers or randomness
-  if (lowerName.includes("violation") || lowerName.includes("bhujia") || lowerName.includes("unlabeled")) {
-    score = 46;
-    fields.mrp = "₹ 120.00"; // Missing inclusive of all taxes
-    fields.mfr_date = "Not declared";
+  // Check Rule 4(1): MRP
+  if (!fields.mrp || fields.mrp.includes("Not Declared") || fields.mrp.includes("Blank")) {
+    score -= 30;
+    violations.push({
+      rule_code: "LMPC-R4(1)",
+      field: "mrp",
+      issue: "Maximum Retail Price (MRP) value is missing or template box is unprinted",
+      severity: "critical",
+      legal_section: "Section 18 / Section 36(1) LM Act 2009",
+      explanation: "Rule 4(1) & Rule 6(1)(e): Pre-packaged commodities must carry standard retail price declaration inclusive of all taxes.",
+      remedy: "Print clear Maximum Retail Price with '(Incl. of all taxes)' declaration."
+    });
+  } else if (!/(incl\.|inclusive).*tax/i.test(fields.mrp)) {
+    score -= 15;
     violations.push({
       rule_code: "LMPC-R4(1)",
       field: "mrp",
       issue: "MRP missing mandatory suffix 'inclusive of all taxes'",
       severity: "critical",
-      explanation: "Rule 4(1): Retail sale price must state 'inclusive of all taxes'."
-    });
-    violations.push({
-      rule_code: "LMPC-R6(6)",
-      field: "mfr_date",
-      issue: "Month and year of manufacture or packing missing on display panel",
-      severity: "major",
-      explanation: "Rule 6(6): Month and year of manufacture, packing or import is mandatory."
-    });
-  } else if (lowerName.includes("partial") || lowerName.includes("oil") || lowerName.includes("biscuit")) {
-    score = 74;
-    fields.customer_care = "care@fmcgindia.com";
-    violations.push({
-      rule_code: "LMPC-R2(l)",
-      field: "customer_care",
-      issue: "Consumer care telephone number missing or not declared alongside email",
-      severity: "minor",
-      explanation: "Rule 2(l): Consumer care contact must provide telephone number and postal address or email."
-    });
-  } else if (lowerName.includes("import") || lowerName.includes("olive")) {
-    score = 42;
-    fields.net_quantity = "16.9 fl oz";
-    fields.country_of_origin = "Not declared";
-    violations.push({
-      rule_code: "LMPC-R7(1)",
-      field: "net_quantity",
-      issue: "Net quantity declared in non-metric units (fluid ounces) instead of standard metric millilitres or litres",
-      severity: "critical",
-      explanation: "Rule 7(1): Net quantity must be in standard SI metric units (g, kg, ml, l)."
-    });
-    violations.push({
-      rule_code: "LMPC-R6(2)",
-      field: "country_of_origin",
-      issue: "Country of origin not declared for imported packaged commodity",
-      severity: "major",
-      explanation: "Rule 6(2): Country of origin must be stated explicitly on imported commodities."
+      legal_section: "Section 18 / Section 36(1) LM Act 2009",
+      explanation: "Rule 4(1): Retail sale price must state 'inclusive of all taxes' or '(Incl. of all taxes)'.",
+      remedy: "Append '(Incl. of all taxes)' to retail sale price declaration."
     });
   }
 
+  // Check Rule 7(1): Net quantity
+  if (!fields.net_quantity || fields.net_quantity.includes("Not Declared") || fields.net_quantity.includes("Blank")) {
+    score -= 25;
+    violations.push({
+      rule_code: "LMPC-R7(1)",
+      field: "net_quantity",
+      issue: "Net quantity is missing or unprinted",
+      severity: "critical",
+      legal_section: "Section 18 / Section 36(1) LM Act 2009",
+      explanation: "Rule 7(1): Net quantity must be explicitly declared in standard metric units.",
+      remedy: "Declare metric net quantity."
+    });
+  } else if (/\b(gms|kgs|fl oz|lbs|oz)\b/i.test(fields.net_quantity)) {
+    score -= 20;
+    violations.push({
+      rule_code: "LMPC-R7(1)",
+      field: "net_quantity",
+      issue: "Non-standard unit symbol used (e.g. 'gms', 'kgs', or non-metric)",
+      severity: "critical",
+      legal_section: "Section 18 / Section 36(1) LM Act 2009",
+      explanation: "Rule 7(1) & Schedule VII: Non-metric units or non-standard symbols like 'gms' are strictly prohibited; standard SI symbol is 'g' or 'kg'.",
+      remedy: "Replace non-standard notation with standard SI symbol ('g', 'kg', 'ml', 'l')."
+    });
+  }
+
+  // Check Rule 6(1)(d): Month & Year of packing/mfg
+  if (!fields.mfr_date || fields.mfr_date.includes("Not Declared") || fields.mfr_date.includes("Blank")) {
+    score -= 15;
+    violations.push({
+      rule_code: "LMPC-R6(1)(d)",
+      field: "mfr_date",
+      issue: "Month and year of manufacture or packing is missing or template box unprinted",
+      severity: "major",
+      legal_section: "Rule 6(1)(d) LM(PC)R 2011",
+      explanation: "Rule 6(1)(d): Month and year of packing or manufacturing is mandatory on pre-packaged goods.",
+      remedy: "Stamp or print legible month and year of packaging."
+    });
+  }
+
+  // Check Rule 6(1)(e): Batch or lot number
+  if (!fields.batch_no || fields.batch_no.includes("Not Declared") || fields.batch_no.includes("Blank")) {
+    score -= 10;
+    violations.push({
+      rule_code: "LMPC-R6(1)(e)",
+      field: "batch_no",
+      issue: "Batch, lot, or identification code missing or template box unprinted",
+      severity: "major",
+      legal_section: "Rule 6(1)(e) LM(PC)R 2011",
+      explanation: "Rule 6(1)(e): Batch or lot identification number is mandatory for product traceability.",
+      remedy: "Print distinct batch/lot code on packaging."
+    });
+  }
+
+  // Check Rule 6(1)(b): Manufacturer details
+  if (!fields.manufacturer_name || fields.manufacturer_name.includes("Not Declared") || fields.manufacturer_name.includes("Blank")) {
+    score -= 15;
+    violations.push({
+      rule_code: "LMPC-R6(1)(b)",
+      field: "manufacturer_name",
+      issue: "Manufacturer or packer postal address is missing or incomplete",
+      severity: "major",
+      legal_section: "Rule 6(1)(b) LM(PC)R 2011",
+      explanation: "Rule 6(1)(b): Name and complete postal address of manufacturer, packer, or importer must be stated.",
+      remedy: "Provide complete manufacturer name and address with PIN code."
+    });
+  }
+
+  // Check Rule 2(l): Consumer care
+  if (!fields.customer_care || fields.customer_care.includes("Not Declared") || fields.customer_care.includes("Blank")) {
+    score -= 10;
+    violations.push({
+      rule_code: "LMPC-R2(l)",
+      field: "customer_care",
+      issue: "Consumer care contact details missing or incomplete",
+      severity: "minor",
+      legal_section: "Rule 2(l) / Rule 6(1)(f) LM(PC)R 2011",
+      explanation: "Rule 2(l): Pre-packaged commodities must provide consumer care telephone number and email or postal address.",
+      remedy: "Provide valid consumer helpline number and email on display panel."
+    });
+  }
+
+  score = Math.max(0, Math.min(100, score));
   const result = score >= 85 ? "compliant" : score >= 60 ? "partial" : "violation";
 
   return {
@@ -525,8 +642,8 @@ function evaluateLabelCompliance(productName, brand, extraFields = {}) {
     fields,
     violations,
     guidance: violations.length === 0
-      ? "Label contains all 7 mandatory declarations mandated by Legal Metrology (Packaged Commodities) Rules, 2011."
-      : `Flagged ${violations.length} statutory non-compliance(s) under LM(PC)R 2011. Notice or rectification advisory recommended.`
+      ? "Label satisfies statutory declarations under LM(PC)R 2011."
+      : `Found ${violations.length} non-compliance issues under LM(PC)R 2011.`
   };
 }
 
@@ -693,123 +810,89 @@ const API = {
     let fileName = file && file.name ? file.name : "label_scan.jpg";
 
     if (file instanceof Blob) {
-      mimeType = file.type || "image/jpeg";
-      base64Data = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const res = reader.result;
-          if (typeof res === "string") {
-            resolve(res.replace(/^data:image\/[a-zA-Z0-9+]+;base64,/, ""));
-          } else {
-            resolve("");
-          }
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      mimeType = file.type === "image/svg+xml" ? "image/svg+xml" : "image/jpeg";
+      base64Data = await optimizeImageForOcr(file);
+      if (!base64Data) {
+        base64Data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const res = reader.result;
+            resolve(typeof res === "string" ? (res.split(",")[1] || "") : "");
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
     } else if (typeof formData?.image_base64 === "string") {
-      base64Data = formData.image_base64.replace(/^data:image\/[a-zA-Z0-9+]+;base64,/, "");
+      base64Data = formData.image_base64.split(",").pop().trim();
       mimeType = formData.mime_type || "image/jpeg";
       fileName = formData.file_name || fileName;
     }
 
+    if (!base64Data) {
+      throw new Error("Unable to read image data. Please select or capture a packaging label photo.");
+    }
+
     let remoteScan = null;
+    let scanErrorMsg = "";
 
     // Call server Gemini AI Multimodal Vision & LM(PC)R statutory compliance endpoint
-    if (base64Data) {
-      try {
-        const res = await fetch("/api/scan/image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            image_base64: base64Data,
-            mime_type: mimeType,
-            file_name: fileName,
-            product_name: prodName,
-            brand: brandName,
-            location: location,
-            inspection_type: inspectionType,
-            category: category,
-            lot_reference: lotRef
-          })
-        });
+    try {
+      const res = await fetch("/api/scan/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_base64: base64Data,
+          mime_type: mimeType,
+          file_name: fileName,
+          product_name: prodName,
+          brand: brandName,
+          location: location,
+          inspection_type: inspectionType,
+          category: category,
+          lot_reference: lotRef
+        })
+      });
 
-        if (res.ok) {
-          remoteScan = await res.json();
-          console.log("[PRISM API] Multimodal AI Vision extracted label information successfully:", remoteScan);
-        } else {
-          const errPayload = await res.json().catch(() => ({}));
-          console.warn("[PRISM API] Remote scan returned error status:", res.status, errPayload);
-        }
-      } catch (err) {
-        console.warn("[PRISM API] Server scan request error, engaging resilient auditor:", err);
+      if (res.ok) {
+        remoteScan = await res.json();
+        console.log("[PRISM API] Multimodal AI Vision extracted label information successfully:", remoteScan);
+      } else {
+        const errPayload = await res.json().catch(() => ({}));
+        scanErrorMsg = errPayload.error || errPayload.detail || `Server audit error (HTTP ${res.status})`;
+        console.warn("[PRISM API] Remote scan returned error:", res.status, scanErrorMsg);
       }
+    } catch (err) {
+      scanErrorMsg = err.message || "Network error connecting to Vision Scanner.";
+      console.warn("[PRISM API] Server scan request failed:", err);
     }
 
-    let finalScan;
-
-    if (remoteScan) {
-      const scanId = "scan-" + Date.now();
-      const pName = remoteScan.product_name || prodName || "Inspected Packaged Item";
-      const bName = remoteScan.brand || brandName || "";
-
-      finalScan = {
-        id: scanId,
-        product_name: pName,
-        brand: bName,
-        compliance_result: remoteScan.compliance_result || remoteScan.status || "compliant",
-        compliance_score: remoteScan.compliance_score ?? remoteScan.score ?? 85,
-        status: remoteScan.compliance_result || remoteScan.status || "compliant",
-        score: remoteScan.compliance_score ?? remoteScan.score ?? 85,
-        created_at: new Date().toISOString(),
-        scanned_at: new Date().toISOString(),
-        image_url: file instanceof Blob ? URL.createObjectURL(file) : "",
-        extracted_fields: remoteScan.extracted_fields || {},
-        raw_ocr_text: remoteScan.raw_ocr_text || "",
-        violations: remoteScan.violations || [],
-        statutory_summary: remoteScan.statutory_summary || "",
-        rag_guidance: remoteScan.rag_guidance || remoteScan.statutory_summary || "Statutory audit completed under LM(PC)R 2011.",
-        model_used: remoteScan.model_used || "gemini-3.8-flash"
-      };
-    } else {
-      // Offline / network fallback
-      const isGeneric = !prodName || /^(screenshot|img|image|scan|photo|capture|upload|whatsapp|document)[-_\s\d.]*$/i.test(prodName);
-      if (file && isGeneric && file.name) {
-        const cleanedName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-        if (!/^(screenshot|img|image|scan|photo|capture|upload|whatsapp|document)[-_\s\d.]*$/i.test(cleanedName)) {
-          prodName = cleanedName.charAt(0).toUpperCase() + cleanedName.slice(1);
-        } else {
-          prodName = "";
-        }
-      }
-      if (!prodName) {
-        prodName = "Packaged Commodity Sample";
-      }
-      if (!brandName || /^(screenshot|img|image|scan|photo|capture|upload)[-_\s\d.]*$/i.test(brandName)) {
-        brandName = prodName === "Packaged Commodity Sample" ? "Packaged Goods" : prodName.split(" ")[0];
-      }
-
-      const evalResult = evaluateLabelCompliance(prodName, brandName);
-
-      finalScan = {
-        id: "scan-" + Date.now(),
-        product_name: prodName,
-        brand: brandName || prodName.split(" ")[0],
-        compliance_result: evalResult.result,
-        compliance_score: evalResult.score,
-        status: evalResult.result,
-        score: evalResult.score,
-        created_at: new Date().toISOString(),
-        scanned_at: new Date().toISOString(),
-        image_url: file instanceof Blob ? URL.createObjectURL(file) : "",
-        extracted_fields: evalResult.fields,
-        raw_ocr_text: `PRODUCT: ${prodName}\nBRAND: ${brandName}\nMRP: ${evalResult.fields.mrp}\nNET QTY: ${evalResult.fields.net_quantity}\nMFD: ${evalResult.fields.mfr_date}\nEXP: ${evalResult.fields.exp_date}\nBATCH: ${evalResult.fields.batch_no}\nMFG BY: ${evalResult.fields.manufacturer_name}\nCUSTOMER CARE: ${evalResult.fields.customer_care}`,
-        violations: evalResult.violations,
-        statutory_summary: evalResult.guidance,
-        rag_guidance: evalResult.guidance,
-        model_used: "client-heuristic-fallback"
-      };
+    if (!remoteScan) {
+      throw new Error(scanErrorMsg || "The AI OCR scanner could not process this packaging image. Please verify your connection or upload a clearer photo.");
     }
+
+    const scanId = "scan-" + Date.now();
+    const pName = remoteScan.product_name || prodName || "Inspected Packaged Item";
+    const bName = remoteScan.brand || brandName || "";
+
+    const finalScan = {
+      id: scanId,
+      product_name: pName,
+      brand: bName,
+      compliance_result: remoteScan.compliance_result || remoteScan.status || "compliant",
+      compliance_score: remoteScan.compliance_score ?? remoteScan.score ?? 85,
+      status: remoteScan.compliance_result || remoteScan.status || "compliant",
+      score: remoteScan.compliance_score ?? remoteScan.score ?? 85,
+      created_at: new Date().toISOString(),
+      scanned_at: new Date().toISOString(),
+      image_url: file instanceof Blob ? URL.createObjectURL(file) : "",
+      extracted_fields: remoteScan.extracted_fields || {},
+      raw_ocr_text: remoteScan.raw_ocr_text || "",
+      violations: remoteScan.violations || [],
+      statutory_summary: remoteScan.statutory_summary || "",
+      rag_guidance: remoteScan.rag_guidance || remoteScan.statutory_summary || "Statutory audit completed under LM(PC)R 2011.",
+      model_used: remoteScan.model_used || "gemini-3.8-flash"
+    };
 
     // Store in history
     const scans = getStore('prism_db_scans', DEFAULT_SCANS);
