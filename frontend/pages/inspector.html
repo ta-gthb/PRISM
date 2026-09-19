@@ -1001,6 +1001,7 @@ Official Seal: Legal Metrology Department
       fields: [
         { key: "manufacturer_details", label: "Manufacturer / Packer Postal Address", rule: "Rule 6(1)(b)" },
         { key: "country_of_origin", label: "Country of Origin", rule: "Rule 6(1)(aa)" },
+        { key: "customer_care", label: "Consumer Care & Helpline", rule: "Rule 2(l)" },
       ]
     }
   ];
@@ -1075,17 +1076,23 @@ Official Seal: Legal Metrology Department
 
       group.fields.forEach(f => {
         let val = fields[f.key];
-        if (!val || val === '—') {
-          if (f.key === 'brand_name') val = fields.brand || currentScanResult?.brand || '—';
-          else if (f.key === 'mfg_date') val = fields.mfr_date || '—';
-          else if (f.key === 'expiry_date') val = fields.exp_date || '—';
-          else if (f.key === 'batch_number') val = fields.batch_no || '—';
-          else if (f.key === 'manufacturer_details') val = fields.manufacturer_name || '—';
+        if (!val || val === '—' || val === 'Not Declared / Not Found') {
+          if (f.key === 'brand_name') val = fields.brand || currentScanResult?.brand || fields.brand_name || '—';
+          else if (f.key === 'mfg_date') val = fields.mfr_date || fields.mfg_date || '—';
+          else if (f.key === 'expiry_date') val = fields.exp_date || fields.expiry_date || fields.best_before || '—';
+          else if (f.key === 'batch_number') val = fields.batch_no || fields.batch_number || '—';
+          else if (f.key === 'manufacturer_details') val = fields.manufacturer_details || fields.manufacturer_name || (fields.address ? (fields.manufacturer_name ? fields.manufacturer_name + ', ' + fields.address : fields.address) : '—');
+          else if (f.key === 'customer_care') val = fields.customer_care || '—';
+          else if (f.key === 'country_of_origin') val = fields.country_of_origin || '—';
+          else if (f.key === 'mrp') val = fields.mrp_raw || fields.mrp || '—';
+          else if (f.key === 'net_quantity') val = fields.net_quantity || '—';
+          else if (f.key === 'unit_sale_price') val = fields.unit_sale_price || '—';
+          else if (f.key === 'fssai_license') val = fields.fssai_license || fields.fssai_no || '—';
           else val = '—';
         }
-        const isViolated = violations.some(v => v.field === f.key);
-        const violationObj = violations.find(v => v.field === f.key);
-        const isEmpty = !fields[f.key] || fields[f.key] === '—';
+        const isViolated = violations.some(v => v.field === f.key || (f.key === 'mfg_date' && v.field === 'mfr_date') || (f.key === 'batch_number' && v.field === 'batch_no') || (f.key === 'manufacturer_details' && v.field === 'manufacturer_name') || (f.key === 'expiry_date' && (v.field === 'exp_date' || v.field === 'best_before')) || (f.key === 'customer_care' && v.field === 'customer_care'));
+        const violationObj = violations.find(v => v.field === f.key || (f.key === 'mfg_date' && v.field === 'mfr_date') || (f.key === 'batch_number' && v.field === 'batch_no') || (f.key === 'manufacturer_details' && v.field === 'manufacturer_name') || (f.key === 'expiry_date' && (v.field === 'exp_date' || v.field === 'best_before')) || (f.key === 'customer_care' && v.field === 'customer_care'));
+        const isEmpty = !val || val === '—' || val === 'Not Declared / Not Found';
 
         html += `
           <div class="field-audit-card ${isViolated ? 'violation-flagged' : ''}" id="field-card-${f.key}">

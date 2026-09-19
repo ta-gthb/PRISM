@@ -1,12 +1,13 @@
 FROM python:3.11-slim
 
-# Install system dependencies (Tesseract OCR, language data, OpenCV runtime libs)
+# Install system dependencies (PaddleOCR deep learning runtime, libgomp1, OpenCV, Tesseract OCR fallback)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    libgl1 \
+    libglib2.0-0 \
     tesseract-ocr \
     tesseract-ocr-eng \
     tesseract-ocr-hin \
-    libgl1 \
-    libglib2.0-0 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
