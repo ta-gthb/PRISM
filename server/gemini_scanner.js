@@ -216,58 +216,60 @@ export async function scanLabelWithGemini({
   // Detect embedded text if available (e.g. from vector/SVG packaging artwork)
   const embeddedText = extractEmbeddedSvgText(cleanBase64);
 
+  // Filter out meaningless screenshot / camera filenames
+  const isGenericFilename = !fileName || /^(screenshot|img|image|scan|photo|capture|upload|whatsapp|document)[-_\s\d.]*$/i.test(fileName);
+  const fileContextNote = isGenericFilename ? "" : `Reference file name: "${fileName}".`;
+
   let prompt = `You are a Senior Legal Metrology Enforcement Officer and AI Vision Specialist under the Department of Consumer Affairs, Ministry of Consumer Affairs, Food & Public Distribution, Government of India.
 
 Analyze this uploaded photograph of a packaged commodity or product label with meticulous optical precision.
-Uploaded file name: "${fileName || "product_label.jpg"}". ${suggestedProduct ? `Suggested context: "${suggestedProduct}".` : ""}
+${fileContextNote} ${suggestedProduct ? `Suggested context: "${suggestedProduct}".` : ""}
 
-YOUR STATUTORY MANDATE:
-Audit compliance under:
-- The Legal Metrology Act, 2009 (Act 1 of 2010) - Sections 18, 36, 49
-- The Legal Metrology (Packaged Commodities) Rules, 2011 (LM(PC)R 2011) - Amendments up to 2024
+CRITICAL OPTICAL EXTRACTION RULES:
+1. BRAND & COMMODITY IDENTIFICATION:
+   - Extract the actual brand name from the logo, brand banner, or manufacturer trade header in the image (e.g., "Thendral Foods", "Haldiram's", "Amul", "Britannia").
+   - Extract the generic commodity or food name from the label text or description (e.g., "Palm Candy", "Refined Sunflower Oil", "Butter Cookies", "Roasted Peanuts").
+   - NEVER use "Screenshot", "Image", "Photo", or file metadata as the brand or commodity name.
 
-TASKS:
-1. OPTICAL CHARACTER RECOGNITION (OCR):
-Transcribe ALL visible and legible text from the package into "raw_ocr_text", preserving exact letters, punctuation, numerals, prices, dates, weights, barcodes, and addresses verbatim.
+2. BLANK OR UNFILLED TEMPLATE BOXES:
+   - Carefully inspect white stamp boxes, inkjet printing zones, and declaration templates.
+   - If a pre-printed label has prompts like "BATCH NO. :", "PKD. :", "M.R.P. Rs. :", "USE BY :" but the actual values or numbers are blank, unprinted, or missing, strictly set that field to "Not Declared / Blank".
+   - Flag missing mandatory values as statutory violations under the Legal Metrology Act, 2009 and LM(PC)R 2011.
 
-2. STATUTORY DECLARATIONS EXTRACTION (LM(PC)R 2011):
-Accurately identify each statutory field from the image. If a field is not present or cannot be found on the label, strictly write "Not Declared / Not Found".
-- product_name: Generic or common name of the commodity (Rule 6(1)(a)). E.g., "Refined Sunflower Oil", "Butter Cookies", "Pure Honey".
-- brand: Brand or trade name.
-- mrp: Maximum Retail Price (Rule 4(1) and Rule 6(1)(e)). State the exact amount (e.g., "₹ 145.00" or "Rs. 145/-") AND explicitly note whether "(Incl. of all taxes)" or "inclusive of all taxes" is present or missing.
-- net_quantity: Net quantity declared in standard metric units (kg, g, L, ml, m, cm, or number) (Rule 7(1)). Check if illegal non-metric units (fluid oz, oz, lbs) are declared.
-- unit_sale_price: Unit Sale Price (USP) per g/ml/kg/L (mandatory under Rule 6(11) for packages containing more than 1 unit/1kg/1L). E.g., "₹ 0.29 / g".
-- mfr_date: Month and year of manufacture, packing, or import (Rule 6(1)(d)). E.g., "04/2025" or "April 2025".
-- exp_date: Best before, use by, or expiry date if stated.
-- batch_no: Batch, lot, or code number (Rule 6(1)(e)). E.g., "B.No. 4022A".
-- manufacturer_name: Complete name and full postal address of manufacturer, packer, or importer including premises/plot, street, city, state, and pin code (Rule 6(1)(b)).
-- country_of_origin: Country of origin (mandatory for imported commodities under Rule 6(1)(aa)).
-- customer_care: Consumer care contact details including designation, address, telephone number, and email (Rule 6(1)(f) and Rule 2(l)).
-- fssai_license: FSSAI License Number or ISI/BIS mark if visible.
-- barcode: Numeric barcode (EAN-13, UPC) if visible.
+3. MANDATORY STATUTORY DECLARATIONS EXTRACTION:
+   - product_name: Generic / common name of the commodity (Rule 6(1)(a)).
+   - brand: Brand or trade name from the packaging.
+   - mrp: Maximum Retail Price (Rule 4(1) and Rule 6(1)(e)). State exact declared amount AND whether "(Incl. of all taxes)" is printed. If the price amount space is blank/unfilled, write "Not Declared / Blank (Template box empty)".
+   - net_quantity: Net quantity declared (Rule 7(1)). Extract exact text (e.g., "200gms" or "500 g"). If non-metric or prohibited symbols like "gms", "kgs", "fl oz" are used, extract exact string and flag statutory violation.
+   - unit_sale_price: Unit Sale Price (Rule 6(11)). E.g., "₹ 0.29 / g" or "Not Declared".
+   - mfr_date: Date/Month/Year of packing or manufacture (Rule 6(1)(d)). If blank/unprinted, write "Not Declared / Blank".
+   - exp_date: Best before, expiry, or use by statement (e.g. "6 Months from Date of Packing").
+   - batch_no: Batch or lot number (Rule 6(1)(e)). If blank/unprinted, write "Not Declared / Blank".
+   - manufacturer_name: Complete name and postal address of manufacturer/packer (Rule 6(1)(b)).
+   - country_of_origin: Country of origin (Rule 6(1)(aa)).
+   - customer_care: Consumer care contact details (phone, email, postal address) (Rule 2(l) / Rule 6(1)(f)).
+   - fssai_license: FSSAI License Number if present, or "Not Declared / Not Found".
+   - barcode: Numeric barcode digits (e.g., EAN-13, UPC) if present.
 
-3. STATUTORY COMPLIANCE AUDIT (LM(PC)R 2011 & Legal Metrology Act 2009):
-Detect all non-compliances:
-- Rule 4(1): MRP missing mandatory "(Incl. of all taxes)" or "inclusive of all taxes" -> Severity: "critical", Legal Section: "Section 18 / Section 36(1) LM Act 2009", Remedy: "Compounding notice or prosecution for non-standard retail declaration".
-- Rule 7(1): Net quantity in non-metric units or non-standard symbols (e.g. gms, kgs, fl oz) -> Severity: "critical", Legal Section: "Section 18 / Section 36(1) LM Act 2009".
-- Rule 6(1)(d) / 6(6): Month & Year of manufacture/packing missing or obscured -> Severity: "major", Legal Section: "Rule 6(1)(d) LM(PC)R 2011".
-- Rule 6(1)(b): Incomplete manufacturer address (missing state, pin code, or premises) -> Severity: "major".
-- Rule 6(1)(f) & 2(l): Consumer care contact missing telephone number or email -> Severity: "minor".
-- Rule 6(1)(aa): Country of origin missing on imported commodity -> Severity: "major".
-- Rule 6(11): Unit Sale Price missing on packages containing >1kg / >1L -> Severity: "minor".
+4. STATUTORY VIOLATIONS AUDIT (LM(PC)R 2011 & Legal Metrology Act 2009):
+   - Rule 4(1) & Rule 6(1)(e): Blank/missing MRP or missing "(Incl. of all taxes)" -> Critical violation under Section 18 / Section 36(1).
+   - Rule 7(1): Use of non-standard symbol "gms" or "kgs" instead of standard "g" or "kg" -> Critical violation under Section 18 / Section 36(1).
+   - Rule 6(1)(d): Blank/missing Date of Packing (PKD) / Manufacturing -> Major violation under Section 36(1).
+   - Rule 6(1)(e): Blank/missing Batch No -> Major violation under Section 36(1).
+   - Rule 6(11): Missing Unit Sale Price declaration -> Advisory / Minor violation.
 
-4. COMPLIANCE SCORING (0 to 100):
-- 85 - 100: "compliant" (all key declarations present, statutory wording compliant).
-- 60 - 84: "partial" (minor omissions like consumer care phone format or USP).
-- 0 - 59: "violation" (missing MRP tax declaration, non-metric units, missing manufacturer address, or missing mfg date).
+5. COMPLIANCE SCORING (0 to 100):
+   - Fully compliant: 85 - 100
+   - Partial / Minor non-compliance: 60 - 84
+   - Critical violations (e.g. blank MRP, blank Mfg date, illegal units): 0 - 59
 
 Output strictly valid JSON with this exact schema:
 {
   "product_name": "...",
   "brand": "...",
-  "compliance_score": 88,
-  "compliance_result": "compliant",
-  "status": "compliant",
+  "compliance_score": 45,
+  "compliance_result": "violation",
+  "status": "violation",
   "extracted_fields": {
     "product_name": "...",
     "brand": "...",
@@ -290,7 +292,7 @@ Output strictly valid JSON with this exact schema:
       "field": "mrp",
       "issue": "...",
       "severity": "critical",
-      "legal_section": "...",
+      "legal_section": "Section 18 / Section 36(1) LM Act 2009",
       "explanation": "...",
       "remedy": "..."
     }

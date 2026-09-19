@@ -773,13 +773,20 @@ const API = {
       };
     } else {
       // Offline / network fallback
-      if (file && !prodName && file.name) {
+      const isGeneric = !prodName || /^(screenshot|img|image|scan|photo|capture|upload|whatsapp|document)[-_\s\d.]*$/i.test(prodName);
+      if (file && isGeneric && file.name) {
         const cleanedName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-        prodName = cleanedName.charAt(0).toUpperCase() + cleanedName.slice(1);
+        if (!/^(screenshot|img|image|scan|photo|capture|upload|whatsapp|document)[-_\s\d.]*$/i.test(cleanedName)) {
+          prodName = cleanedName.charAt(0).toUpperCase() + cleanedName.slice(1);
+        } else {
+          prodName = "";
+        }
       }
       if (!prodName) {
         prodName = "Packaged Commodity Sample";
-        brandName = "Inspected Brand";
+      }
+      if (!brandName || /^(screenshot|img|image|scan|photo|capture|upload)[-_\s\d.]*$/i.test(brandName)) {
+        brandName = prodName === "Packaged Commodity Sample" ? "Packaged Goods" : prodName.split(" ")[0];
       }
 
       const evalResult = evaluateLabelCompliance(prodName, brandName);
