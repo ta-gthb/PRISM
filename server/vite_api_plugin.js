@@ -203,7 +203,10 @@ function sendHtmlOrDownload(res, filename, content, mime = "text/html") {
 
 function normalizeApiPath(rawUrl) {
   try {
-    const urlObj = new URL(rawUrl || "/", "http://localhost:3000");
+    const raw = String(rawUrl || "/");
+    const urlObj = raw.startsWith("http://") || raw.startsWith("https://")
+      ? new URL(raw)
+      : new URL(raw.startsWith("/") ? raw : "/" + raw, "http://localhost:3000");
     let pathname = urlObj.pathname || "/";
     // Strip trailing slashes (except root "/")
     if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -222,7 +225,8 @@ function normalizeApiPath(rawUrl) {
 
 function addApiRoutes(middlewares) {
   middlewares.use(async (req, res, next) => {
-    const { pathname, urlObj } = normalizeApiPath(req.url);
+    const rawUrl = req.originalUrl || req.url;
+    const { pathname, urlObj } = normalizeApiPath(rawUrl);
     const method = (req.method || "GET").toUpperCase();
 
     if (method === "OPTIONS") {
@@ -235,7 +239,7 @@ function addApiRoutes(middlewares) {
     }
 
     // ── GET /health & /api/scan/health ─────────────────────────────────
-    if ((pathname === "/health" || pathname === "/api/scan/health" || pathname === "/api/health" || pathname.endsWith("/api/health")) && method === "GET") {
+    if ((pathname === "/health" || pathname === "/api/scan/health" || pathname === "/api/health" || pathname.endsWith("/api/health") || pathname.includes("/health")) && method === "GET") {
       return sendJson(res, 200, {
         status: "ok",
         mode: "live-ai-audit",
@@ -246,7 +250,7 @@ function addApiRoutes(middlewares) {
     }
 
     // ── POST /api/scan/image ───────────────────────────────────────────
-    if ((pathname === "/api/scan/image" || pathname.endsWith("/api/scan/image")) && method === "POST") {
+    if ((pathname === "/api/scan/image" || pathname.endsWith("/api/scan/image") || pathname.includes("/scan/image")) && method === "POST") {
       try {
         const rawBuffer = await readBody(req);
         const contentType = req.headers["content-type"] || "";
