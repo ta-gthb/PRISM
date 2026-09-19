@@ -24,8 +24,9 @@ function getGenAI() {
 
 // Order prioritizing robust multimodal vision flash models
 const CANDIDATE_MODELS = [
-  "gemini-3.8-flash",
-  "gemini-flash-latest",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-2.5-pro",
 ];
 
 function sleep(ms) {

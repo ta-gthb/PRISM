@@ -721,77 +721,19 @@
         return;
       }
 
-      let report;
-      try {
-        report = await API.generateReport({
-          title: `Legal Metrology Inspection Report — ${scan.product_name || 'Commodity'}`,
-          report_type: 'detailed',
-          format: 'pdf',
-          filters: { scan_id: scan.id }
-        });
-      } catch (e) {
-        console.warn('Backend report generation fallback:', e);
-      }
+      const report = await API.generateReport({
+        title: `Legal Metrology Inspection Report — ${scan.product_name || 'Commodity'}`,
+        report_type: 'detailed',
+        format: 'pdf',
+        scan_id: scan.id,
+        scan_data: scan
+      });
 
-      if (report && report.file_url && !report.file_url.startsWith('data:')) {
-        const downloadUrl = API.downloadReport(report.id, 'pdf') || report.file_url;
-        window.open(downloadUrl, '_blank');
+      if (report && (report.file_url || report.id)) {
+        const downloadUrl = API.downloadReport(report.id, report.format || 'pdf');
+        window.open(downloadUrl, '_blank', 'noopener');
         showToast('Inspection report generated.', 'success');
-      } else {
-        const fields = scan.extracted_fields || {};
-        const textContent = `
-===================================================================
-MINISTRY OF CONSUMER AFFAIRS · LEGAL METROLOGY DIVISION
-STATUTORY LABEL COMPLIANCE INSPECTION REPORT
-===================================================================
-Report ID         : REP-${Date.now()}
-Scan ID           : ${scan.id}
-Date & Time       : ${scan.scanned_at || scan.created_at || new Date().toLocaleString()}
-Product Name      : ${scan.product_name || 'N/A'}
-Brand Name        : ${scan.brand || 'N/A'}
-Compliance Status : ${(scan.status || scan.compliance_result || 'N/A').toUpperCase()}
-Compliance Score  : ${scan.score ?? scan.compliance_score ?? 0}%
-Inspection Engine : ${scan.model_used || 'AI Vision Engine'}
-
--------------------------------------------------------------------
-MANDATORY STATUTORY DECLARATIONS AUDITED
--------------------------------------------------------------------
-FSSAI / Standard Mark               : ${fields.fssai_license || '—'}
-Maximum Retail Price (MRP)          : ${fields.mrp || '—'}
-Net Quantity (SI Units)             : ${fields.net_quantity || '—'}
-Unit Sale Price (USP)              : ${fields.unit_sale_price || '—'}
-Date of Manufacture / Packing       : ${fields.mfg_date || fields.mfr_date || '—'}
-Expiry / Best Before Date           : ${fields.expiry_date || fields.exp_date || '—'}
-Batch / Lot / Code Number           : ${fields.batch_number || fields.batch_no || '—'}
-Manufacturer / Packer Address       : ${fields.manufacturer_details || fields.manufacturer_name || '—'}
-Country of Origin                   : ${fields.country_of_origin || '—'}
-
--------------------------------------------------------------------
-STATUTORY NON-COMPLIANCES / VIOLATIONS (${(scan.violations || []).length})
--------------------------------------------------------------------
-${(scan.violations || []).map((v, i) => `${i+1}. [${(v.severity || 'MAJOR').toUpperCase()}] ${v.rule_code || 'Rule'} - ${v.field}: ${v.description || v.message || 'Non-compliance detected'}`).join('\n') || 'None. Packaging label satisfies statutory provisions under LM(PC)R 2011.'}
-
--------------------------------------------------------------------
-STATUTORY AUDIT FINDINGS & LEGAL ACTION
--------------------------------------------------------------------
-${scan.statutory_summary || scan.rag_guidance || 'Inspected under Rule 4, 6, and 7 of Legal Metrology (Packaged Commodities) Rules, 2011.'}
-
-===================================================================
-Officer Signature: Enforcement Inspector (Delhi Zone)
-Official Seal: Legal Metrology Department
-===================================================================
-`.trim();
-
-        const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `LM_Inspection_Report_${(scan.product_name || 'commodity').replace(/[^a-zA-Z0-9]/g, '_')}_${scan.id}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('Inspection report downloaded successfully.', 'success');
+        loadReports();
       }
     } catch (err) {
       console.error(err);

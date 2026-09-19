@@ -932,71 +932,33 @@ const API = {
   },
 
   generateReport: async (body) => {
-    const remote = await apiRequest('POST', '/api/reports/generate', {
+    const payload = {
       title: body.title || 'Compliance Report',
       report_type: body.report_type || (body.type === 'product_scan' ? 'product' : body.type) || 'summary',
-      format: body.format || 'pdf',
-      filters: body.filters || (body.period ? { period: body.period } : {}),
-    });
-    if (remote) return remote;
+      format: (body.format || 'pdf').toLowerCase(),
+      scan_id: body.scan_id || (body.filters && body.filters.scan_id),
+      scan_data: body.scan_data,
+      filters: body.filters || (body.period ? { period: body.period } : {})
+    };
 
-    const repId = "rep-" + Date.now();
+    const remote = await apiRequest('POST', '/api/reports/generate', payload);
+    if (remote) {
+      const reports = getStore('lm_mock_reports', DEFAULT_REPORTS);
+      reports.unshift(remote);
+      setStore('lm_mock_reports', reports);
+      return remote;
+    }
+
+    const repId = "REP-" + Date.now();
     const title = body.title || "Legal Metrology Compliance Audit Report";
     const format = (body.format || "pdf").toUpperCase();
-
-    // Create a real downloadable HTML/SVG report blob
-    const reportHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${title}</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #1e293b; max-width: 800px; margin: auto; }
-    .header { border-bottom: 2px solid #0f172a; padding-bottom: 16px; margin-bottom: 24px; }
-    .title { font-size: 22px; font-weight: bold; color: #0f172a; }
-    .meta { font-size: 13px; color: #64748b; margin-top: 6px; }
-    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #f1f5f9; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-    th, td { border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; }
-    th { background: #f8fafc; font-weight: 600; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-      <div>
-        <div class="title">${title}</div>
-        <div class="meta">Department of Consumer Affairs · Legal Metrology Division · Govt. of India</div>
-      </div>
-      <span class="badge">Official Report</span>
-    </div>
-    <div class="meta" style="margin-top:12px;">Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST | System: PRISM v2.1</div>
-  </div>
-  <h3>Statutory Inspection Summary</h3>
-  <table>
-    <thead>
-      <tr><th>Rule Code</th><th>Field Name</th><th>Statutory Requirement</th><th>Standard Action</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>LMPC-R6(1)</td><td>Manufacturer Details</td><td>Name & address on packaging</td><td>Compoundable under Sec 49</td></tr>
-      <tr><td>LMPC-R7(1)</td><td>Net Quantity</td><td>Standard metric units (kg, g, L, ml)</td><td>Prosecution under Sec 36</td></tr>
-      <tr><td>LMPC-R4(1)</td><td>Retail Sale Price</td><td>MRP incl. of all taxes</td><td>Mandatory rectification</td></tr>
-      <tr><td>LMPC-R6(6)</td><td>Date of Packing</td><td>Month and year of manufacture</td><td>Seizure of non-compliant lot</td></tr>
-    </tbody>
-  </table>
-  <p style="font-size:11px;color:#94a3b8;margin-top:32px;text-align:center;">This is a digitally generated document certified by PRISM enforcement framework.</p>
-</body>
-</html>`;
-
-    const blob = new Blob([reportHtml], { type: "text/html" });
-    const downloadUrl = URL.createObjectURL(blob);
 
     const newReport = {
       id: repId,
       title: title,
       type: body.report_type || "summary",
       format: format,
-      file_url: downloadUrl,
+      file_url: `/api/reports/${repId}/download?format=${format.toLowerCase()}`,
       created_at: new Date().toISOString()
     };
 
@@ -1007,17 +969,9 @@ const API = {
     return newReport;
   },
 
-  downloadReport: (id, fmt) => {
-    const reports = getStore('lm_mock_reports', DEFAULT_REPORTS);
-    const rep = reports.find(r => String(r.id) === String(id));
-    if (rep && rep.file_url && rep.file_url.startsWith("blob:")) {
-      return rep.file_url;
-    }
-    if (CONFIG.API_BASE_URL) {
-      return `${CONFIG.API_BASE_URL}/api/reports/${id}/download?format=${fmt}`;
-    }
-    // Return sample downloadable data uri
-    return `data:text/html;charset=utf-8,${encodeURIComponent(`<h1>PRISM Compliance Report ${id}</h1><p>Generated: ${new Date().toLocaleString()}</p>`)}`;
+  downloadReport: (id, fmt = 'pdf') => {
+    const base = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    return `${base}/api/reports/${id}/download?format=${fmt}`;
   },
 
   // Admin User Management

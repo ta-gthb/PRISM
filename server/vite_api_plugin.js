@@ -448,13 +448,15 @@ function addApiRoutes(middlewares) {
         const body = JSON.parse(rawBuffer.toString("utf-8"));
         const reportType = body.report_type || body.type || "summary";
         const format = (body.format || "PDF").toUpperCase();
-        const targetScanId = body.scan_id || (LIVE_STORE.scans[0] ? LIVE_STORE.scans[0].id : null);
-        const scan = LIVE_STORE.scans.find(s => s.id === targetScanId) || LIVE_STORE.scans[0];
+        const targetScanId = body.scan_id || (body.filters && body.filters.scan_id);
+        const scan = (targetScanId && LIVE_STORE.scans.find(s => s.id === targetScanId)) ||
+          body.scan_data ||
+          LIVE_STORE.scans[0];
 
         const reportId = `REP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-        const reportTitle = reportType === "violation_notice"
+        const reportTitle = body.title || (reportType === "violation_notice"
           ? `Statutory Inspection Notice — ${scan ? scan.product_name : 'Packaged Goods'}`
-          : `LM(PC)R Compliance Audit Report (${format})`;
+          : `LM(PC)R 2011 Compliance Audit Report — ${scan ? scan.product_name : 'Commodity'}`);
 
         const newReport = {
           id: reportId,
@@ -464,7 +466,9 @@ function addApiRoutes(middlewares) {
           file_url: `/api/reports/${reportId}/download?format=${format.toLowerCase()}`,
           created_at: new Date().toISOString(),
           target_product: scan ? scan.product_name : "All Inspected Items",
-          violations_count: scan ? (scan.violations || []).length : 0
+          violations_count: scan ? (scan.violations || []).length : 0,
+          scan_id: scan ? scan.id : null,
+          scan_data: scan || null
         };
 
         LIVE_STORE.reports.unshift(newReport);
@@ -478,73 +482,237 @@ function addApiRoutes(middlewares) {
     if (pathname.startsWith("/api/reports/") && pathname.endsWith("/download") && method === "GET") {
       const parts = pathname.split("/");
       const repId = parts[3];
-      const format = urlObj.searchParams.get("format") || "pdf";
-      const report = LIVE_STORE.reports.find(r => r.id === repId) || LIVE_STORE.reports[0];
-      const scan = LIVE_STORE.scans[0];
+      const format = (urlObj.searchParams.get("format") || "pdf").toLowerCase();
+      const report = LIVE_STORE.reports.find(r => r.id === repId);
+      const scan = (report && report.scan_data) ||
+        (report && report.scan_id && LIVE_STORE.scans.find(s => s.id === report.scan_id)) ||
+        LIVE_STORE.scans[0];
 
       if (format === "csv" || format === "excel" || format === "xlsx") {
-        let csv = "Report ID,Title,Product,Status,Score,Violations Count,Date\n";
-        LIVE_STORE.scans.forEach(s => {
-          csv += `"${repId}","${report ? report.title : 'Audit'}","${s.product_name}","${s.status}",${s.compliance_score},${(s.violations||[]).length},"${s.created_at}"\n`;
-        });
+        let csv = "Report ID,Title,Product,Brand,Status,Compliance Score,Violations Count,MRP,Net Quantity,Mfg Date,Batch No,Manufacturer,Customer Care,Date\n";
+        if (scan) {
+          const ef = scan.extracted_fields || {};
+          csv += `"${repId}","${report ? report.title : 'Statutory Audit'}","${scan.product_name || ''}","${scan.brand || ''}","${scan.status || scan.compliance_result || ''}",${scan.compliance_score || scan.score || 0},${(scan.violations||[]).length},"${ef.mrp || ''}","${ef.net_quantity || ''}","${ef.mfr_date || ef.mfg_date || ''}","${ef.batch_no || ef.batch_number || ''}","${(ef.manufacturer_name || ef.manufacturer_details || '').replace(/"/g, '""')}","${(ef.customer_care || '').replace(/"/g, '""')}","${scan.created_at || new Date().toISOString()}"\n`;
+        }
         return sendHtmlOrDownload(res, `${repId}.csv`, csv, "text/csv");
       }
 
-      // Printable HTML Inspection Report
+      const ef = (scan && scan.extracted_fields) || {};
+      const score = scan ? (scan.compliance_score ?? scan.score ?? 0) : 100;
+      const status = scan ? (scan.status || scan.compliance_result || 'compliant').toUpperCase() : 'COMPLIANT';
+      const violations = (scan && scan.violations) || [];
+      const scoreColor = status === 'VIOLATION' ? '#dc2626' : status === 'PARTIAL' ? '#d97706' : '#166534';
+
+      // Printable Official Legal Metrology Statutory Inspection Report & Notice
       const htmlDoc = `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>${report ? report.title : 'Legal Metrology Report'}</title>
+  <title>${report ? report.title : 'Legal Metrology Statutory Report'}</title>
   <style>
-    body { font-family: 'Times New Roman', Georgia, serif; line-height: 1.6; margin: 40px; color: #111; max-width: 800px; margin: auto; }
-    .header { text-align: center; border-bottom: 2px solid #222; padding-bottom: 12px; margin-bottom: 20px; }
-    .title { font-size: 18px; font-weight: bold; text-transform: uppercase; margin: 5px 0; }
-    .sub { font-size: 13px; color: #444; }
-    .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    .meta-table td { padding: 6px 8px; border: 1px solid #ccc; font-size: 13px; }
-    .meta-table th { background: #f0f0f0; padding: 6px 8px; border: 1px solid #ccc; font-size: 13px; text-align: left; }
-    .score-box { background: #fafafa; border: 2px solid #333; padding: 16px; margin: 20px 0; text-align: center; }
-    .violation-card { border-left: 4px solid #dc2626; padding: 8px 12px; margin-bottom: 10px; background: #fff5f5; }
-    .footer { margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px; border-top: 1px solid #ccc; padding-top: 12px; }
+    @media print {
+      body { margin: 15mm; }
+      .no-print { display: none !important; }
+    }
+    body {
+      font-family: 'Times New Roman', Georgia, serif;
+      line-height: 1.5;
+      margin: 30px auto;
+      max-width: 820px;
+      color: #111827;
+      background: #ffffff;
+      padding: 24px;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #1e293b;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+    .emblem { font-size: 26px; margin-bottom: 4px; }
+    .govt-heading { font-size: 11px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; color: #4b5563; }
+    .dept-title { font-size: 18px; font-weight: bold; color: #0f172a; margin: 4px 0; }
+    .sub-dept { font-size: 12px; color: #374151; font-weight: 600; }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 12.5px;
+    }
+    .meta-item { display: flex; justify-content: space-between; }
+    .meta-item strong { color: #334155; }
+    .score-card {
+      border: 2px solid ${scoreColor};
+      background: #fdfefe;
+      border-radius: 6px;
+      padding: 14px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .score-badge {
+      font-size: 32px;
+      font-weight: 800;
+      color: ${scoreColor};
+      min-width: 90px;
+      text-align: center;
+      border-right: 2px solid #e2e8f0;
+      padding-right: 14px;
+    }
+    .score-summary { font-size: 13px; color: #1e293b; }
+    table.declarations {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      font-size: 12px;
+    }
+    table.declarations th, table.declarations td {
+      border: 1px solid #94a3b8;
+      padding: 6px 10px;
+      text-align: left;
+    }
+    table.declarations th {
+      background: #e2e8f0;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .violation-block {
+      border-left: 4px solid #dc2626;
+      background: #fef2f2;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 12.5px;
+      border-radius: 0 4px 4px 0;
+    }
+    .violation-title { font-weight: bold; color: #991b1b; }
+    .violation-law { font-size: 11px; color: #4b5563; font-family: monospace; margin-top: 3px; }
+    .ocr-box {
+      background: #f1f5f9;
+      border: 1px dashed #64748b;
+      padding: 10px 14px;
+      font-family: monospace;
+      font-size: 11px;
+      white-space: pre-wrap;
+      max-height: 180px;
+      overflow-y: auto;
+      margin-bottom: 24px;
+    }
+    .action-bar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .btn {
+      background: #1e293b;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-family: sans-serif;
+      font-size: 12px;
+      cursor: pointer;
+      border: none;
+    }
+    .footer-seal {
+      margin-top: 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      font-size: 12px;
+      border-top: 1px solid #94a3b8;
+      padding-top: 16px;
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div style="font-size:11px;letter-spacing:1px;">GOVERNMENT OF INDIA · MINISTRY OF CONSUMER AFFAIRS, FOOD &amp; PUBLIC DISTRIBUTION</div>
-    <div class="title">DEPARTMENT OF LEGAL METROLOGY</div>
-    <div class="sub">Packaged Rules Inspection &amp; Scanning Mechanism (PRISM) · Statutory Audit Report</div>
+  <div class="action-bar no-print">
+    <button class="btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
   </div>
 
-  <table class="meta-table">
-    <tr><th>Report Reference</th><td>${repId}</td><th>Audit Date</th><td>${new Date().toLocaleString('en-IN')}</td></tr>
-    <tr><th>Inspected Product</th><td>${scan ? scan.product_name : 'Packaged Commodity'}</td><th>Brand</th><td>${scan ? scan.brand : '—'}</td></tr>
-    <tr><th>Compliance Score</th><td><strong>${scan ? scan.compliance_score : 85}% (${scan ? scan.status.toUpperCase() : 'COMPLIANT'})</strong></td><th>Rules Applied</th><td>LM(PC)R 2011 &amp; Legal Metrology Act 2009</td></tr>
+  <div class="header">
+    <div class="emblem">🏛️</div>
+    <div class="govt-heading">Government of India · Ministry of Consumer Affairs, Food &amp; Public Distribution</div>
+    <div class="dept-title">DEPARTMENT OF LEGAL METROLOGY</div>
+    <div class="sub-dept">Packaged Rules Inspection &amp; Scanning Mechanism (PRISM) · Statutory Compliance Audit</div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-item"><span><strong>Notice / Audit Ref:</strong></span> <span>${repId}</span></div>
+    <div class="meta-item"><span><strong>Audit Date &amp; Time:</strong></span> <span>${scan ? (scan.scanned_at || scan.created_at || new Date().toLocaleString('en-IN')) : new Date().toLocaleString('en-IN')}</span></div>
+    <div class="meta-item"><span><strong>Inspected Product:</strong></span> <span>${scan ? scan.product_name : 'Packaged Commodity'}</span></div>
+    <div class="meta-item"><span><strong>Brand:</strong></span> <span>${scan ? (scan.brand || '—') : '—'}</span></div>
+    <div class="meta-item"><span><strong>Barcode / GTIN:</strong></span> <span>${ef.barcode || '—'}</span></div>
+    <div class="meta-item"><span><strong>Analysis Engine:</strong></span> <span>${scan ? (scan.model_used || 'Gemini Multimodal Vision') : 'PRISM Core'}</span></div>
+  </div>
+
+  <div class="score-card">
+    <div class="score-badge">
+      ${score}%
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.5px;">${status}</div>
+    </div>
+    <div class="score-summary">
+      <strong>Statutory Compliance Assessment:</strong><br/>
+      ${scan ? (scan.statutory_summary || scan.rag_guidance || 'Audit completed against provisions of Legal Metrology (Packaged Commodities) Rules, 2011.') : 'Audit complete.'}
+    </div>
+  </div>
+
+  <h4 style="margin: 16px 0 8px; font-size:14px; text-transform:uppercase; letter-spacing:0.5px;">1. Audited Statutory Declarations (Rule 4, 6 &amp; 7 of LM(PC)R 2011)</h4>
+  <table class="declarations">
+    <thead>
+      <tr>
+        <th style="width:32%;">Statutory Field</th>
+        <th style="width:48%;">Extracted Package Declaration</th>
+        <th style="width:20%;">LM(PC)R Rule</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Common / Generic Name</td><td>${ef.product_name || 'Not Declared'}</td><td>Rule 6(1)(a)</td></tr>
+      <tr><td>Maximum Retail Price (MRP)</td><td>${ef.mrp || 'Not Declared'}</td><td>Rule 4(1) &amp; 6(1)(e)</td></tr>
+      <tr><td>Net Quantity (SI Units)</td><td>${ef.net_quantity || 'Not Declared'}</td><td>Rule 7(1)</td></tr>
+      <tr><td>Unit Sale Price (USP)</td><td>${ef.unit_sale_price || 'Not Declared'}</td><td>Rule 6(1)(s)</td></tr>
+      <tr><td>Date of Manufacture / Packing</td><td>${ef.mfr_date || ef.mfg_date || 'Not Declared'}</td><td>Rule 6(1)(d)</td></tr>
+      <tr><td>Expiry / Best Before</td><td>${ef.exp_date || ef.expiry_date || 'Not Declared'}</td><td>Rule 6(1)(d)</td></tr>
+      <tr><td>Batch / Lot / Code No.</td><td>${ef.batch_no || ef.batch_number || 'Not Declared'}</td><td>Rule 6(1)(e)</td></tr>
+      <tr><td>Manufacturer / Packer Details</td><td>${ef.manufacturer_name || ef.manufacturer_details || 'Not Declared'}</td><td>Rule 6(1)(b)</td></tr>
+      <tr><td>Country of Origin</td><td>${ef.country_of_origin || 'Not Declared'}</td><td>Rule 6(1)(aa)</td></tr>
+      <tr><td>Consumer Care Redressal</td><td>${ef.customer_care || 'Not Declared'}</td><td>Rule 6(1)(f)</td></tr>
+      <tr><td>FSSAI License / BIS Mark</td><td>${ef.fssai_license || 'Not Declared'}</td><td>FSSAI / BIS Acts</td></tr>
+    </tbody>
   </table>
 
-  <div class="score-box">
-    <div style="font-size:14px;color:#555;">STATUTORY COMPLIANCE EVALUATION</div>
-    <div style="font-size:32px;font-weight:bold;color:${scan && scan.status==='violation' ? '#dc2626' : '#166534'};">${scan ? scan.compliance_score : 85} / 100</div>
-    <div style="font-size:13px;margin-top:6px;">${scan ? scan.statutory_summary : 'Label complies with Legal Metrology statutory provisions.'}</div>
-  </div>
+  <h4 style="margin: 16px 0 8px; font-size:14px; text-transform:uppercase; letter-spacing:0.5px;">2. Statutory Violations &amp; Legal Metrology Observations (${violations.length})</h4>
+  ${violations.length > 0 ? violations.map((v, i) => `
+    <div class="violation-block">
+      <div class="violation-title">${i + 1}. [${(v.severity || 'MAJOR').toUpperCase()}] ${v.rule_code || 'Statutory Rule'} — ${v.issue || v.description}</div>
+      <div class="violation-law"><strong>Statutory Provision:</strong> ${v.legal_section || v.legal_reference || 'Section 18 read with Section 36(1) of Legal Metrology Act, 2009'}</div>
+      <div style="font-size:11.5px;color:#374151;margin-top:3px;"><strong>Recommended Enforcement Action:</strong> ${v.remedy || 'Issue compounding show-cause memo under Section 49 or rectification notice.'}</div>
+    </div>
+  `).join('') : '<p style="font-size:12.5px;color:#166534;background:#f0fdf4;padding:10px;border-radius:4px;">No statutory violations detected. The packaging label satisfies mandatory declarations under LM(PC)R 2011.</p>'}
 
-  <h3>Detected Non-Compliances &amp; Statutory Flags</h3>
-  ${scan && scan.violations && scan.violations.length > 0 
-    ? scan.violations.map(v => `
-      <div class="violation-card">
-        <strong>${v.rule_code} — ${v.field.toUpperCase()}:</strong> ${v.issue}
-        <div style="font-size:11px;color:#666;margin-top:4px;">Legal Provision: ${v.legal_section || 'Section 18 / Section 36(1) LM Act 2009'}</div>
-        <div style="font-size:11px;color:#333;margin-top:2px;">Remedy / Action: ${v.remedy || 'Rectify packaging declaration'}</div>
-      </div>
-    `).join('')
-    : '<p><em>No statutory non-compliances flagged. All mandatory declarations under LM(PC)R 2011 are present.</em></p>'
-  }
+  ${scan && scan.raw_ocr_text ? `
+    <h4 style="margin: 16px 0 8px; font-size:14px; text-transform:uppercase; letter-spacing:0.5px;">3. Verbatim Label OCR Transcription</h4>
+    <div class="ocr-box">${scan.raw_ocr_text}</div>
+  ` : ''}
 
-  <div class="footer">
-    <div>Verified by PRISM Enforcement AI System<br/>Government of India Legal Metrology Portal</div>
-    <div style="text-align:right;">Authorized Enforcement Wing<br/>Department of Consumer Affairs</div>
+  <div class="footer-seal">
+    <div>
+      <strong>Packaged Rules Inspection &amp; Scanning Mechanism (PRISM)</strong><br/>
+      Department of Legal Metrology · Govt. of India<br/>
+      <span style="font-size:10px;color:#64748b;">Digital Verification Hash: SHA256-${repId}-${Date.now().toString(16)}</span>
+    </div>
+    <div style="text-align:center;min-width:200px;">
+      <div style="border-bottom:1px solid #111;width:160px;margin:0 auto 6px;"></div>
+      <strong>Authorized Enforcement Inspector</strong><br/>
+      <span style="font-size:11px;color:#64748b;">Legal Metrology Department</span>
+    </div>
   </div>
-  <script>window.onload = function() { window.print(); };<\/script>
 </body>
 </html>`;
 
