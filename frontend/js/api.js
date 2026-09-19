@@ -665,15 +665,27 @@ const API = {
     let file = null;
     let prodName = "";
     let brandName = "";
+    let location = "";
+    let inspectionType = "";
+    let category = "";
+    let lotRef = "";
 
     if (formData instanceof FormData) {
       file = formData.get("file");
       prodName = formData.get("product_name") || "";
       brandName = formData.get("brand") || "";
+      location = formData.get("location") || "";
+      inspectionType = formData.get("inspection_type") || "";
+      category = formData.get("category") || "";
+      lotRef = formData.get("lot_reference") || "";
     } else if (formData && formData.file) {
       file = formData.file;
       prodName = formData.product_name || "";
       brandName = formData.brand || "";
+      location = formData.location || "";
+      inspectionType = formData.inspection_type || "";
+      category = formData.category || "";
+      lotRef = formData.lot_reference || "";
     }
 
     let base64Data = "";
@@ -703,7 +715,7 @@ const API = {
 
     let remoteScan = null;
 
-    // Call server Gemini AI OCR endpoint
+    // Call server Gemini AI Multimodal Vision & LM(PC)R statutory compliance endpoint
     if (base64Data) {
       try {
         const res = await fetch("/api/scan/image", {
@@ -714,19 +726,23 @@ const API = {
             mime_type: mimeType,
             file_name: fileName,
             product_name: prodName,
-            brand: brandName
+            brand: brandName,
+            location: location,
+            inspection_type: inspectionType,
+            category: category,
+            lot_reference: lotRef
           })
         });
 
         if (res.ok) {
           remoteScan = await res.json();
-          console.log("[PRISM API] Gemini AI extracted label information successfully:", remoteScan);
+          console.log("[PRISM API] Multimodal AI Vision extracted label information successfully:", remoteScan);
         } else {
           const errPayload = await res.json().catch(() => ({}));
-          console.warn("[PRISM API] Remote scan returned error:", errPayload);
+          console.warn("[PRISM API] Remote scan returned error status:", res.status, errPayload);
         }
       } catch (err) {
-        console.warn("[PRISM API] Server scan request error, falling back to local heuristic:", err);
+        console.warn("[PRISM API] Server scan request error, engaging resilient auditor:", err);
       }
     }
 
