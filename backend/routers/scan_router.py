@@ -92,7 +92,7 @@ async def scan_image(
         # Process image via OCR if raster image
         if file.content_type != "application/pdf":
             try:
-                ocr_result = ocr_service.process_image(image_bytes)
+                ocr_result = ocr_service.process_image(image_bytes, file.content_type or "image/jpeg")
             except Exception as exc:
                 ocr_result = {"fields": {}, "analysis": {}}
         else:
