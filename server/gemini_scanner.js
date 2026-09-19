@@ -4,9 +4,14 @@ import { evaluateFieldsCompliance } from "./statutory_rules.js";
 let aiInstance = null;
 
 function getGenAI() {
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    "";
   if (!aiInstance) {
     aiInstance = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
+      apiKey: apiKey || undefined,
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
@@ -17,9 +22,8 @@ function getGenAI() {
   return aiInstance;
 }
 
-// Order prioritizing high-throughput vision model followed by full flash model
+// Order prioritizing robust multimodal vision flash models
 const CANDIDATE_MODELS = [
-  "gemini-3.1-flash-lite",
   "gemini-3.8-flash",
   "gemini-flash-latest",
 ];
@@ -291,9 +295,12 @@ Output strictly valid JSON with this exact schema:
       console.log(`[PRISM Scanner] Attempting label extraction using model: ${modelName}`);
       const response = await ai.models.generateContent({
         model: modelName,
-        contents: {
-          parts: [imagePart, textPart],
-        },
+        contents: [
+          {
+            role: "user",
+            parts: [imagePart, textPart],
+          },
+        ],
         config: {
           responseMimeType: "application/json",
           temperature: 0.1,
