@@ -228,52 +228,132 @@
 
       <!-- Scanner Section -->
       <div id="section-scanner" class="section">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-          <button type="button" class="btn btn-outline btn-sm" onclick="showSection('dashboard', document.querySelector('[data-page=dashboard]'))" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;font-size:13px;font-weight:500;">
-            ← Back
-          </button>
-          <h2 style="font-family:var(--font-display);font-size:18px;font-weight:700;margin:0;color:var(--text-base);">Label Scanner</h2>
-        </div>
-        <!-- Sample Test Presets for Enforcement Testing -->
-        <div class="card" style="margin-bottom:16px;background:var(--parchment);border-color:var(--border);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-            <div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">
-              <span style="font-size:16px;">🏷️</span>
-              <span>Quick Test with Authentic Packaged Commodity Labels:</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="showSection('dashboard', document.querySelector('[data-page=dashboard]'))" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;font-size:13px;font-weight:500;">
+              ← Back
+            </button>
+            <div>
+              <h2 style="font-family:var(--font-display);font-size:18px;font-weight:700;margin:0;color:var(--text-base);">Packaged Commodity Label Inspection</h2>
+              <div style="font-size:12px;color:var(--text-muted);">Legal Metrology (Packaged Commodities) Rules, 2011 · Optical &amp; Statutory Audit</div>
             </div>
-            <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);">Instant one-click test labels</span>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button type="button" class="btn btn-outline btn-sm" onclick="loadSamplePreset('ghee_compliant')" style="background:var(--bg-card);">
-              <span style="color:var(--compliant);">●</span> Amul Cow Ghee 1L (100% Compliant)
-            </button>
-            <button type="button" class="btn btn-outline btn-sm" onclick="loadSamplePreset('cookies_violation')" style="background:var(--bg-card);">
-              <span style="color:var(--violation);">●</span> Cookies 120g (Violates R4(1): Missing Tax)
-            </button>
-            <button type="button" class="btn btn-outline btn-sm" onclick="loadSamplePreset('olive_oil_violation')" style="background:var(--bg-card);">
-              <span style="color:var(--violation);">●</span> Olive Oil (Violates R7(1): Non-Metric 'fl oz')
-            </button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="badge" style="background:var(--parchment-dark);color:var(--navy-900);font-family:var(--font-mono);font-size:11px;" id="active-memo-badge">MEMO: INSP-DEL-2026</span>
           </div>
         </div>
 
+        <!-- Field Inspection Intake Metadata Form -->
+        <div class="card" style="margin-bottom:16px;background:var(--bg-card);border:1px solid var(--border);">
+          <div class="card-header" style="padding:10px 16px;background:var(--parchment);cursor:pointer;" onclick="toggleIntakeForm()">
+            <span class="card-title" style="font-size:13px;display:flex;align-items:center;gap:6px;">
+              <span>📋 Field Inspection &amp; Premises Metadata</span>
+            </span>
+            <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);" id="intake-toggle-text">▾ Expand / Edit</span>
+          </div>
+          <div class="card-body" id="intake-form-body" style="display:block;padding:14px 16px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;">
+              <div>
+                <label style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Inspection Premise / Market Location</label>
+                <input type="text" id="insp-location" class="form-input" style="padding:6px 10px;font-size:12px;width:100%;" value="Retail Supermarket / Market Yard, Connaught Place" placeholder="e.g., Reliance Smart Bazaar, Hubli" />
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Inspection Type</label>
+                <select id="insp-type" class="form-input" style="padding:6px 10px;font-size:12px;width:100%;">
+                  <option value="market_surveillance">Market Surveillance Audit (Routine)</option>
+                  <option value="consumer_complaint">Consumer Complaint Investigation</option>
+                  <option value="warehouse_inspection">Warehouse &amp; Depot Bulk Audit</option>
+                  <option value="import_clearance">Port of Entry / Import Inspection</option>
+                  <option value="factory_dispatch">Factory Pre-Packing Audit</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Commodity Category</label>
+                <select id="insp-category" class="form-input" style="padding:6px 10px;font-size:12px;width:100%;">
+                  <option value="food_groceries">Packaged Food &amp; Groceries</option>
+                  <option value="edible_oils">Edible Oils, Vanaspati &amp; Ghee</option>
+                  <option value="cosmetics_toiletries">Cosmetics &amp; Toiletries</option>
+                  <option value="beverages">Packaged Drinking Water &amp; Beverages</option>
+                  <option value="electronics_hardware">Electronics &amp; Hardware</option>
+                  <option value="general_prepackaged">General Pre-Packaged Commodities</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Sample Collection Lot / Batch Ref</label>
+                <input type="text" id="insp-lot-ref" class="form-input" style="padding:6px 10px;font-size:12px;width:100%;" placeholder="e.g., LOT-SAM-4402" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scanner Card with Dual Mode (Device Camera + High-Res Upload) -->
         <div class="card" style="margin-bottom:20px;">
-          <div class="card-header">
-            <span class="card-title">Upload Product Packaging Label</span>
-            <span style="font-size:12px;color:var(--text-muted);font-family:var(--font-mono);">Gemini Multimodal AI Vision · LM(PC)R 2011</span>
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <span class="card-title">Packaging Label Acquisition &amp; AI Optical Audit</span>
+            <span style="font-size:12px;color:var(--text-muted);font-family:var(--font-mono);">Gemini Multimodal Vision · LM(PC)R 2011 Engine</span>
           </div>
           <div class="card-body">
-            <div class="upload-zone" id="upload-zone" onclick="document.getElementById('label-file').click()">
-              <div class="upload-zone-icon">📷</div>
-              <div class="upload-zone-title">Drop product label or packaging image here</div>
-              <div class="upload-zone-sub">or click to browse JPG, PNG, WEBP files from your device</div>
-              <input type="file" id="label-file" accept="image/*" style="display:none" onchange="handleFileSelect(this)" />
+            <!-- Mode Switcher Tabs -->
+            <div class="scan-mode-tabs">
+              <button type="button" class="scan-mode-btn active" id="btn-mode-camera" onclick="switchScanMode('camera')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                Field Device Camera (Live Viewfinder)
+              </button>
+              <button type="button" class="scan-mode-btn" id="btn-mode-upload" onclick="switchScanMode('upload')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Upload Packaging Photo / Label File
+              </button>
+            </div>
+
+            <!-- MODE 1: Live Camera Viewfinder -->
+            <div id="camera-mode-view">
+              <div class="camera-container" id="camera-box">
+                <video id="camera-stream" class="camera-video" autoplay playsinline muted></video>
+                <div class="camera-overlay" id="camera-overlay">
+                  <div class="camera-hint">Align packaging label inside frame</div>
+                  <div class="camera-reticle"></div>
+                  <div class="camera-hint" style="font-size:10px;">Ensure MRP, Net Wt, Mfg Date &amp; Address are illuminated</div>
+                </div>
+                <div id="camera-placeholder" style="text-align:center;padding:24px;color:#bbb;">
+                  <div style="font-size:36px;margin-bottom:12px;">📷</div>
+                  <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:6px;">Live Field Camera Standby</div>
+                  <div style="font-size:12px;color:#aaa;max-width:320px;margin:0 auto 16px;">Click Start Camera to capture live packaging labels directly with your device camera or webcam.</div>
+                  <button type="button" class="btn btn-amber" onclick="startCamera()">
+                    ▶ Start Live Camera
+                  </button>
+                </div>
+              </div>
+              <canvas id="camera-canvas" style="display:none;"></canvas>
+
+              <div class="camera-controls-bar" id="camera-active-controls" style="display:none;">
+                <button type="button" class="btn btn-amber" onclick="captureCameraPhoto()" style="padding:10px 20px;font-weight:600;display:inline-flex;align-items:center;gap:8px;">
+                  <span style="font-size:16px;">📸</span>
+                  <span>Capture &amp; Run AI Audit</span>
+                </button>
+                <button type="button" class="btn btn-outline" onclick="switchCameraFacing()">
+                  🔄 Switch Camera
+                </button>
+                <button type="button" class="btn btn-outline" onclick="stopCamera()">
+                  ⏹ Stop Camera
+                </button>
+              </div>
+            </div>
+
+            <!-- MODE 2: File Upload Zone -->
+            <div id="upload-mode-view" style="display:none;">
+              <div class="upload-zone" id="upload-zone" onclick="document.getElementById('label-file').click()">
+                <div class="upload-zone-icon">📁</div>
+                <div class="upload-zone-title">Drop product label photograph or packaging artwork here</div>
+                <div class="upload-zone-sub">Supports high-res JPG, PNG, WEBP packaging images from field devices</div>
+                <input type="file" id="label-file" accept="image/*" style="display:none" onchange="handleFileSelect(this)" />
+              </div>
             </div>
 
             <!-- Inspection Lens / Preview Card -->
             <div id="preview-wrapper" style="display:none;margin-top:16px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
                 <span style="font-size:12px;font-weight:600;color:var(--text-base);display:flex;align-items:center;gap:6px;">
-                  <span>🔍 Packaging Inspection View</span>
+                  <span>🔍 Captured Packaging Inspection View</span>
                   <span id="file-info" style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);font-weight:normal;"></span>
                 </span>
                 <div class="lens-controls" style="margin:0;padding:4px 8px;">
@@ -281,6 +361,7 @@
                   <button type="button" class="lens-btn" onclick="zoomPreview(-0.2)" title="Zoom out">−</button>
                   <button type="button" class="lens-btn" onclick="resetPreviewZoom()" title="Reset zoom">100%</button>
                   <button type="button" class="lens-btn" id="contrast-toggle-btn" onclick="toggleContrast()" title="Enhance high-contrast for dot-matrix text">High Contrast</button>
+                  <button type="button" class="lens-btn" id="invert-toggle-btn" onclick="toggleInvert()" title="Invert for dark/metallic foil packaging">Invert</button>
                 </div>
               </div>
               <div style="overflow:auto;max-height:360px;background:#1a1a1a;border-radius:8px;border:1px solid var(--border);text-align:center;padding:12px;">
@@ -299,10 +380,10 @@
               </div>
             </div>
 
-            <div style="margin-top:16px;display:flex;gap:10px;align-items:center;">
+            <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
               <button class="btn btn-amber" id="scan-btn" onclick="runScan()" disabled>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 5V3h2M11 3h2v2M2 11v2h2M11 13h2v-2" stroke="white" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="8" r="2.5" stroke="white" stroke-width="1.4"/></svg>
-                Scan with AI Vision
+                Run AI Compliance Audit
               </button>
               <button class="btn btn-outline" onclick="clearScan()">Clear Image</button>
               <span id="active-scan-badge" style="display:none;font-size:11px;font-family:var(--font-mono);color:var(--text-muted);margin-left:auto;"></span>
@@ -323,12 +404,15 @@
                 <h3 id="scan-product-name" style="font-family:var(--font-display);font-size:18px;font-weight:700;margin:6px 0 2px;"></h3>
                 <div id="scan-brand" style="font-size:13px;color:var(--text-muted);"></div>
               </div>
-              <div style="display:flex;gap:8px;">
-                <button type="button" class="btn btn-outline btn-sm" onclick="openStatutoryNoticeModal()">
-                  📄 Draft Legal Notice
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-amber btn-sm" onclick="openStatutoryNoticeModal()">
+                  📄 Draft Section 18 Show-Cause Notice
                 </button>
-                <button type="button" class="btn btn-outline btn-sm" onclick="window.print()">
-                  🖨️ Export PDF
+                <button type="button" class="btn btn-outline btn-sm" onclick="openCompoundingMemoModal()">
+                  ⚖️ Compounding Memo (Sec 49)
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="exportScanReportPdf()">
+                  🖨️ Export PDF Report
                 </button>
               </div>
             </div>
@@ -337,7 +421,7 @@
           <!-- Score & Guidance Grid -->
           <div class="two-col" style="margin-top:0;margin-bottom:20px;">
             <div class="card">
-              <div class="card-header"><span class="card-title">Compliance Assessment</span></div>
+              <div class="card-header"><span class="card-title">Statutory Compliance Assessment</span></div>
               <div class="card-body" style="text-align:center;">
                 <div id="score-ring-container"></div>
                 <div id="score-status" style="margin-top:12px;"></div>
@@ -346,7 +430,7 @@
             </div>
             <div class="card">
               <div class="card-header">
-                <span class="card-title">Legal Metrology Summary &amp; Action</span>
+                <span class="card-title">Enforcement Summary &amp; Statutory Action</span>
               </div>
               <div class="card-body">
                 <div id="statutory-summary-text" style="font-size:13px;line-height:1.6;color:var(--text-base);margin-bottom:12px;"></div>
@@ -372,7 +456,7 @@
 
               <!-- TAB 1: Statutory Fields -->
               <div id="tab-content-fields">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
                   <span style="font-size:12px;color:var(--text-muted);">
                     Auditing statutory declarations required under Rule 4, 6, and 7 of LM(PC)R 2011. You can verify or correct any field below.
                   </span>
@@ -403,6 +487,7 @@
         </div>
       </div>
 
+
       <!-- Statutory Inspection Notice Modal -->
       <div id="statutory-notice-modal" class="modal-backdrop" style="display:none;">
         <div class="modal" style="max-width:680px;">
@@ -421,6 +506,28 @@
             <button type="button" class="btn btn-outline" onclick="copyNoticeText()">Copy Notice Text</button>
             <button type="button" class="btn btn-amber" onclick="printNoticeDocument()">🖨️ Print Formal Notice</button>
             <button type="button" class="btn btn-outline" onclick="closeStatutoryNoticeModal()">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compounding Memo & Seizure Order Modal (Section 49) -->
+      <div id="compounding-memo-modal" class="modal-backdrop" style="display:none;">
+        <div class="modal" style="max-width:680px;">
+          <div class="modal-header">
+            <span class="modal-title" style="font-family:var(--font-display);font-size:16px;font-weight:700;">
+              Government of India · Compounding Order &amp; Seizure Memo (Section 49)
+            </span>
+            <button type="button" class="modal-close" onclick="closeCompoundingMemoModal()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div id="compounding-document-content" style="background:#fff;color:#111;padding:24px;border:1px solid #ddd;border-radius:6px;font-family:Georgia, serif;font-size:13px;line-height:1.7;">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="copyCompoundingText()">Copy Text</button>
+            <button type="button" class="btn btn-amber" onclick="printCompoundingDocument()">🖨️ Print Compounding Order</button>
+            <button type="button" class="btn btn-outline" onclick="closeCompoundingMemoModal()">Close</button>
           </div>
         </div>
       </div>
@@ -759,11 +866,114 @@
     } catch(e) { list.innerHTML = '<p style="color:var(--text-muted);">Could not load reports.</p>'; }
   }
 
-  // ── Inspection Lens State ───────────────────────────
+  // ── Inspection Lens & Scanner State ────────────────
   let currentZoom = 1.0;
   let isHighContrast = false;
+  let isInverted = false;
   let currentScanResult = null;
   let editedFields = {};
+  let currentFacingMode = 'environment'; // Back camera default on mobile
+  let cameraStream = null;
+
+  function toggleIntakeForm() {
+    const body = document.getElementById('intake-form-body');
+    const toggleText = document.getElementById('intake-toggle-text');
+    if (body.style.display === 'none') {
+      body.style.display = 'block';
+      toggleText.textContent = '▴ Collapse';
+    } else {
+      body.style.display = 'none';
+      toggleText.textContent = '▾ Expand / Edit';
+    }
+  }
+
+  function switchScanMode(mode) {
+    const cameraBtn = document.getElementById('btn-mode-camera');
+    const uploadBtn = document.getElementById('btn-mode-upload');
+    const cameraView = document.getElementById('camera-mode-view');
+    const uploadView = document.getElementById('upload-mode-view');
+
+    if (mode === 'camera') {
+      cameraBtn.classList.add('active');
+      uploadBtn.classList.remove('active');
+      cameraView.style.display = 'block';
+      uploadView.style.display = 'none';
+    } else {
+      uploadBtn.classList.add('active');
+      cameraBtn.classList.remove('active');
+      uploadView.style.display = 'block';
+      cameraView.style.display = 'none';
+      stopCamera();
+    }
+  }
+
+  async function startCamera() {
+    try {
+      if (cameraStream) stopCamera();
+      const constraints = {
+        video: {
+          facingMode: currentFacingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      };
+      cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const video = document.getElementById('camera-stream');
+      video.srcObject = cameraStream;
+      document.getElementById('camera-placeholder').style.display = 'none';
+      document.getElementById('camera-overlay').style.display = 'flex';
+      document.getElementById('camera-active-controls').style.display = 'flex';
+      showToast('Live camera connected. Align packaging label.', 'info');
+    } catch (err) {
+      console.warn('Camera error:', err);
+      showToast('Camera access unavailable or blocked: ' + (err.message || 'Please use file upload.'), 'error');
+      switchScanMode('upload');
+    }
+  }
+
+  function stopCamera() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      cameraStream = null;
+    }
+    const video = document.getElementById('camera-stream');
+    if (video) video.srcObject = null;
+    const placeholder = document.getElementById('camera-placeholder');
+    if (placeholder) placeholder.style.display = 'block';
+    const activeControls = document.getElementById('camera-active-controls');
+    if (activeControls) activeControls.style.display = 'none';
+  }
+
+  async function switchCameraFacing() {
+    currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+    await startCamera();
+  }
+
+  async function captureCameraPhoto() {
+    const video = document.getElementById('camera-stream');
+    if (!video || !cameraStream) {
+      return showToast('Please start the camera first.', 'error');
+    }
+    const canvas = document.getElementById('camera-canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(blob => {
+      if (!blob) return showToast('Failed to capture frame.', 'error');
+      const file = new File([blob], `label_capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const input = document.getElementById('label-file');
+      input.files = dt.files;
+
+      handleFileSelect(input);
+      stopCamera();
+      showToast('Packaging frame captured! Running AI audit…', 'info');
+      runScan();
+    }, 'image/jpeg', 0.95);
+  }
 
   function zoomPreview(delta) {
     currentZoom = Math.min(3.0, Math.max(0.4, currentZoom + delta));
@@ -777,53 +987,34 @@
     img.style.transform = 'scale(1)';
   }
 
-  function toggleContrast() {
-    isHighContrast = !isHighContrast;
+  function applyPreviewFilters() {
     const img = document.getElementById('scan-preview');
-    const btn = document.getElementById('contrast-toggle-btn');
-    if (isHighContrast) {
-      img.style.filter = 'contrast(220%) grayscale(100%) brightness(95%)';
-      btn.classList.add('active');
-    } else {
-      img.style.filter = 'none';
-      btn.classList.remove('active');
-    }
+    let filters = [];
+    if (isHighContrast) filters.push('contrast(220%) grayscale(100%) brightness(95%)');
+    if (isInverted) filters.push('invert(100%)');
+    img.style.filter = filters.length > 0 ? filters.join(' ') : 'none';
   }
 
-  // ── Sample Presets Loader ───────────────────────────
-  async function loadSamplePreset(presetKey) {
-    if (!window.SAMPLE_LABELS || !window.SAMPLE_LABELS[presetKey]) {
-      return showToast('Sample label not found.', 'error');
-    }
-    const sample = window.SAMPLE_LABELS[presetKey];
+  function toggleContrast() {
+    isHighContrast = !isHighContrast;
+    const btn = document.getElementById('contrast-toggle-btn');
+    if (isHighContrast) btn.classList.add('active');
+    else btn.classList.remove('active');
+    applyPreviewFilters();
+  }
 
-    // Convert and rasterize vector artwork into high-definition PNG for optical vision analysis
-    let blob = null;
-    if (typeof window.SAMPLE_LABELS.getPngBlob === 'function') {
-      blob = await window.SAMPLE_LABELS.getPngBlob(presetKey);
-    }
-    if (!blob) {
-      const res = await fetch(sample.getDataUrl());
-      blob = await res.blob();
-    }
-    const isPng = blob.type && blob.type.includes('png');
-    const file = new File([blob], `${sample.id}.${isPng ? 'png' : 'svg'}`, { type: blob.type || 'image/png' });
-
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    const input = document.getElementById('label-file');
-    input.files = dt.files;
-
-    handleFileSelect(input);
-    showToast(`Loaded sample: ${sample.title}. Scanning…`, 'info');
-    runScan();
+  function toggleInvert() {
+    isInverted = !isInverted;
+    const btn = document.getElementById('invert-toggle-btn');
+    if (isInverted) btn.classList.add('active');
+    else btn.classList.remove('active');
+    applyPreviewFilters();
   }
 
   async function handleFileSelect(input) {
     let file = input.files[0];
     if (!file) return;
 
-    // If an SVG vector was selected, convert to high-res PNG for optimal AI model OCR
     if ((file.type === 'image/svg+xml' || file.name.endsWith('.svg')) && window.SAMPLE_LABELS && window.SAMPLE_LABELS.rasterizeSvgToPngBlob) {
       try {
         const svgText = await file.text();
@@ -857,7 +1048,7 @@
   async function runScan() {
     const btn = document.getElementById('scan-btn');
     const file = document.getElementById('label-file').files[0];
-    if (!file) return showToast('Please select an image first.', 'error');
+    if (!file) return showToast('Please capture or select an image first.', 'error');
 
     btn.disabled = true;
     const progressBox = document.getElementById('scan-progress-box');
@@ -875,6 +1066,12 @@
     try {
       const fd = new FormData();
       fd.append('file', file);
+      // Attach intake inspection context
+      fd.append('location', document.getElementById('insp-location')?.value || '');
+      fd.append('inspection_type', document.getElementById('insp-type')?.value || '');
+      fd.append('category', document.getElementById('insp-category')?.value || '');
+      fd.append('lot_reference', document.getElementById('insp-lot-ref')?.value || '');
+
       const result = await API.scanImage(fd);
 
       clearTimeout(stepTimer);
@@ -960,7 +1157,6 @@
       editedFields.brand_name = result.brand || result.extracted_fields?.brand_name || result.extracted_fields?.brand || '—';
     }
 
-    // Score explanation
     const scoreExp = document.getElementById('score-explanation');
     if (result.compliance_score >= 80) {
       scoreExp.textContent = 'High compliance with statutory declarations under LM(PC)R 2011.';
@@ -970,7 +1166,6 @@
       scoreExp.textContent = 'Critical statutory violations detected. Liable under Section 36 of Legal Metrology Act, 2009.';
     }
 
-    // Statutory summary and recommended legal action
     const violations = result.violations || [];
     const critCount = violations.filter(v => v.severity === 'critical').length;
     const majCount = violations.filter(v => v.severity === 'major').length;
@@ -993,13 +1188,9 @@
       actionBox.innerHTML = '<strong>Recommended Action:</strong> Issue Rectification Advisory to manufacturer/packer within 15 working days.';
     }
 
-    // Render Tab 1: Statutory Fields
     renderStatutoryFields();
-
-    // Render Tab 2: Violations
     renderViolationsTab(violations);
 
-    // Render Tab 3: Raw OCR
     const rawOcr = result.raw_ocr_text || result.extracted_text || 'No raw OCR transcription returned.';
     document.getElementById('raw-ocr-display').textContent = rawOcr;
   }
@@ -1284,6 +1475,116 @@
     printWindow.document.close();
   }
 
+  // ── Compounding Memo & Order (Section 49) ────────────
+  function openCompoundingMemoModal() {
+    if (!currentScanResult) return showToast('Please scan a label first.', 'info');
+    const modal = document.getElementById('compounding-memo-modal');
+    const content = document.getElementById('compounding-document-content');
+    const session = getSession();
+    const officerName = session ? (session.name || session.userId || 'Legal Metrology Officer') : 'Legal Metrology Officer';
+    const officerState = session?.state || 'National Capital Territory of Delhi';
+
+    const pName = currentScanResult.product_name || 'Packaged Commodity';
+    const mfg = editedFields.manufacturer_details || 'Manufacturer / Packer';
+    const violations = currentScanResult.violations || [];
+    const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    // Calculate compounding penalty based on Section 48/49 LM Act 2009
+    const critCount = violations.filter(v => v.severity === 'critical').length;
+    const majCount = violations.filter(v => v.severity === 'major').length;
+    const penaltyAmount = violations.length === 0 ? 0 : Math.min(25000, (critCount * 10000) + (majCount * 5000) + 2500);
+
+    content.innerHTML = `
+      <div style="text-align:center;border-bottom:2px solid #222;padding-bottom:12px;margin-bottom:16px;">
+        <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#555;">Government of India · Legal Metrology Department</div>
+        <div style="font-size:16px;font-weight:bold;color:#111;margin-top:4px;">COMPOUNDING OF OFFENCE &amp; SEIZURE MEMO</div>
+        <div style="font-size:12px;color:#444;">UNDER SECTION 49 OF THE LEGAL METROLOGY ACT, 2009 · ${officerState.toUpperCase()}</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;margin-bottom:14px;font-size:12px;">
+        <div><strong>Memo Ref:</strong> PRISM/CMP/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}</div>
+        <div><strong>Date:</strong> ${dateStr}</div>
+      </div>
+
+      <div style="margin-bottom:12px;font-size:12px;">
+        <strong>Offender / Packer Details:</strong><br/>
+        ${mfg}<br/>
+        <strong>Product Seized / Audited:</strong> ${pName} (Batch: ${editedFields.batch_number || 'N/A'})
+      </div>
+
+      <div style="background:#f9f9f9;padding:12px;border:1px solid #ddd;border-radius:4px;margin-bottom:14px;">
+        <strong>Statutory Compounding Assessment:</strong>
+        <ul style="margin:6px 0 0;padding-left:20px;">
+          <li>Total Non-Compliances: <strong>${violations.length}</strong></li>
+          <li>Assessed Compounding Sum: <strong style="font-size:14px;color:#b91c1c;">₹ ${penaltyAmount.toLocaleString('en-IN')} /-</strong></li>
+          <li>Statutory Compounding Head: <strong>Section 49 read with Rule 4, 6 &amp; 7 LM(PC)R 2011</strong></li>
+        </ul>
+      </div>
+
+      <p style="font-size:12px;">
+        The authorized representative of the manufacturer/packer has applied to compound the offence before the undersigned officer. Upon realization of the assessed compounding fee, no further prosecution under Section 36 shall be instituted for this batch.
+      </p>
+
+      <div style="margin-top:30px;display:flex;justify-content:space-between;">
+        <div style="text-align:center;min-width:180px;">
+          <div style="border-bottom:1px solid #333;width:140px;margin:0 auto 6px;"></div>
+          <span style="font-size:11px;color:#555;">Signature of Offender / Authorized Rep</span>
+        </div>
+        <div style="text-align:center;min-width:180px;">
+          <div style="border-bottom:1px solid #333;width:140px;margin:0 auto 6px;"></div>
+          <strong>${officerName}</strong><br/>
+          <span style="font-size:11px;color:#555;">Legal Metrology Inspector</span>
+        </div>
+      </div>
+    `;
+
+    modal.style.display = 'flex';
+  }
+
+  function closeCompoundingMemoModal() {
+    document.getElementById('compounding-memo-modal').style.display = 'none';
+  }
+
+  function copyCompoundingText() {
+    const text = document.getElementById('compounding-document-content').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Compounding memo copied to clipboard.', 'success');
+    }).catch(() => {
+      showToast('Failed to copy text.', 'error');
+    });
+  }
+
+  function printCompoundingDocument() {
+    const printContents = document.getElementById('compounding-document-content').innerHTML;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return showToast('Popup blocked. Please allow popups.', 'error');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Legal Metrology Compounding Memo</title>
+          <style>body { font-family: Georgia, serif; font-size: 13pt; line-height: 1.6; margin: 40px; color: #000; }</style>
+        </head>
+        <body>
+          ${printContents}
+          <script>window.onload = function() { window.print(); window.close(); };<\/script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  }
+
+  async function exportScanReportPdf() {
+    try {
+      showToast('Generating official inspection PDF report…', 'info');
+      const title = currentScanResult?.product_name ? `Inspection Audit - ${currentScanResult.product_name}` : 'Field Inspection Report';
+      const report = await API.generateReport({ title, report_type: 'summary', format: 'pdf' });
+      window.open(API.downloadReport(report.id, report.format), '_blank', 'noopener');
+      loadReports();
+    } catch (e) {
+      showToast('Report export failed: ' + e.message, 'error');
+    }
+  }
+
   function filterProducts(q) {
     const rows = document.querySelectorAll('#products-body tr');
     rows.forEach(r => {
@@ -1304,18 +1605,20 @@
 
   // Drag-and-drop
   const zone = document.getElementById('upload-zone');
-  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-  zone.addEventListener('drop', e => {
-    e.preventDefault(); zone.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      document.getElementById('label-file').files = dt.files;
-      handleFileSelect(document.getElementById('label-file'));
-    }
-  });
+  if (zone) {
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        document.getElementById('label-file').files = dt.files;
+        handleFileSelect(document.getElementById('label-file'));
+      }
+    });
+  }
 
   async function loadDashboard() {
     await Promise.all([loadStats(), loadRecentScans(), loadViolations()]);

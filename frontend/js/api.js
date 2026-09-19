@@ -412,10 +412,6 @@ function setStore(key, data) {
 
 // ─── Network Request with Fallback ──────────────────────────────────
 async function apiRequest(method, path, body = null, isFormData = false) {
-  if (CONFIG.DEMO_MODE) {
-    return null; // Signals to use local mock handler
-  }
-
   const url = CONFIG.API_BASE_URL ? `${CONFIG.API_BASE_URL}${path}` : path;
   const headers = { ...getAuthHeader() };
   if (!isFormData && body && typeof body === 'object') {
@@ -435,7 +431,7 @@ async function apiRequest(method, path, body = null, isFormData = false) {
     }
     return await res.json();
   } catch (err) {
-    console.warn(`API request to ${path} failed (${err.message}). Falling back to client state.`);
+    console.warn(`API request to ${path} failed (${err.message}). Falling back to local store.`);
     return null;
   }
 }
