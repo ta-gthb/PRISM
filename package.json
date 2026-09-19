@@ -5,9 +5,9 @@
   "type": "module",
   "description": "PRISM (Packaged Rules Inspection & Scanning Mechanism) — Vanilla HTML/CSS/JS frontend",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --host 0.0.0.0 --port 3000",
     "lint": "node --check frontend/js/*.js"
   },
   "devDependencies": {

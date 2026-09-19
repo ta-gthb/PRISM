@@ -918,6 +918,8 @@ function addApiRoutes(middlewares) {
       }
     }
 
+const ACTIVE_OTPS = new Map();
+
     // ── POST /api/auth/staff-login ─────────────────────────────────────
     if (pathname === "/api/auth/staff-login" && method === "POST") {
       try {
@@ -926,25 +928,32 @@ function addApiRoutes(middlewares) {
         const { user_id, password, role } = body;
         const uLower = (user_id || "").trim().toLowerCase();
 
+        if (!user_id || !password) {
+          return sendJson(res, 400, { error: "User ID and password are required." });
+        }
+
         const user = LIVE_STORE.users.find(u => 
           (u.user_id && u.user_id.toLowerCase() === uLower) || 
-          (u.email && u.email.toLowerCase() === uLower) ||
-          (uLower === 'admin' && u.role === 'admin')
+          (u.email && u.email.toLowerCase() === uLower)
         );
 
-        const targetRole = role || (user ? user.role : "inspector");
-        const resolvedUserId = user ? user.user_id : (user_id || "officer");
+        if (!user || (role && user.role !== role) || user.is_active === false) {
+          return sendJson(res, 401, { error: "Invalid user ID, role, or inactive account." });
+        }
+
+        const targetRole = user.role;
+        const resolvedUserId = user.user_id;
         const token = "prism_jwt_" + Buffer.from(JSON.stringify({ user_id: resolvedUserId, role: targetRole, time: Date.now() })).toString("base64");
 
         return sendJson(res, 200, {
           token,
           user_id: resolvedUserId,
-          name: user ? user.name : (resolvedUserId ? resolvedUserId.charAt(0).toUpperCase() + resolvedUserId.slice(1) : "Enforcement Officer"),
-          email: user ? user.email : `${resolvedUserId}@doca.gov.in`,
+          name: user.name,
+          email: user.email,
           role: targetRole,
-          state: user ? user.state : "Delhi",
-          organization: user ? user.organization : "Department of Consumer Affairs",
-          designation: user ? user.designation : (targetRole === 'admin' ? 'System Administrator' : targetRole === 'supervisor' ? 'Nodal Officer' : 'Field Inspector'),
+          state: user.state,
+          organization: user.organization,
+          designation: user.designation,
           is_active: true
         });
       } catch (err) {
@@ -954,7 +963,24 @@ function addApiRoutes(middlewares) {
 
     // ── POST /api/auth/otp/request & verify ─────────────────────────────
     if (pathname === "/api/auth/otp/request" && method === "POST") {
-      return sendJson(res, 200, { message: "OTP sent successfully to registered mobile number.", otp_hint: "1234" });
+      try {
+        const rawBuffer = await readBody(req);
+        const body = rawBuffer.length ? JSON.parse(rawBuffer.toString("utf-8")) : {};
+        const mobile = (body.mobile || body.phone || "").toString().replace(/\D/g, "");
+        if (mobile.length !== 10) {
+          return sendJson(res, 400, { error: "Valid 10-digit mobile number is required." });
+        }
+
+        const generatedCode = Math.floor(100000 + Math.random() * 900000).toString().slice(0, 4);
+        ACTIVE_OTPS.set(mobile, {
+          code: generatedCode,
+          expiresAt: Date.now() + 10 * 60 * 1000
+        });
+
+        return sendJson(res, 200, { message: "OTP sent successfully to registered mobile number." });
+      } catch (err) {
+        return sendJson(res, 400, { error: err.message });
+      }
     }
 
     if (pathname === "/api/auth/otp/verify" && method === "POST") {
@@ -962,7 +988,20 @@ function addApiRoutes(middlewares) {
         const rawBuffer = await readBody(req);
         const body = JSON.parse(rawBuffer.toString("utf-8"));
         const role = body.role || "consumer";
-        const mobile = body.mobile || "9876543210";
+        const mobile = (body.mobile || body.phone || "").toString().replace(/\D/g, "");
+        const otp = (body.otp || body.code || "").toString().trim();
+
+        if (mobile.length !== 10 || !otp) {
+          return sendJson(res, 400, { error: "Mobile number and OTP code are required." });
+        }
+
+        const record = ACTIVE_OTPS.get(mobile);
+        if (!record || record.code !== otp || Date.now() > record.expiresAt) {
+          return sendJson(res, 401, { error: "Invalid or expired verification code." });
+        }
+
+        ACTIVE_OTPS.delete(mobile);
+
         const prefix = role === "manufacturer" ? "MFR91" : "CTZN91";
         const userId = `${prefix}_${new Date().getFullYear()}_${mobile.slice(-4)}`;
 
@@ -980,12 +1019,28 @@ function addApiRoutes(middlewares) {
 
     // ── GET & PUT /api/auth/me ──────────────────────────────────────────
     if (pathname === "/api/auth/me" && method === "GET") {
+      const authHeader = req.headers["authorization"] || "";
+      let currentUserId = null;
+      if (authHeader.startsWith("Bearer prism_jwt_")) {
+        try {
+          const raw = authHeader.replace("Bearer prism_jwt_", "");
+          const decoded = JSON.parse(Buffer.from(raw, "base64").toString("utf-8"));
+          currentUserId = decoded.user_id;
+        } catch (_) {}
+      }
+
+      const user = LIVE_STORE.users.find(u => u.user_id === currentUserId) || LIVE_STORE.users[0];
+      if (!user) {
+        return sendJson(res, 401, { error: "Unauthorized" });
+      }
+
       return sendJson(res, 200, {
-        user_id: "rajesh.agarwal",
-        name: "Rajesh Agarwal",
-        role: "inspector",
-        state: "Delhi",
-        is_active: true
+        user_id: user.user_id,
+        name: user.name,
+        role: user.role,
+        state: user.state,
+        email: user.email,
+        is_active: user.is_active
       });
     }
 

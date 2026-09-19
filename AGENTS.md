@@ -104,18 +104,17 @@ const session = requireAuth('rolename');  // redirects to / if not authenticated
 
 ## User Roles & Auth
 
-| Role | Auth Method | User ID Format | Demo Credentials |
-|------|------------|---------------|-----------------|
-| Admin | Email + Password | `admin` | `admin` / `Admin@2025` |
-| Inspector | Email + Password | `rajesh.agarwal` | `rajesh.agarwal` / `Insp@Delhi1` |
-| Supervisor | Email + Password | `meera.krishnan` | `meera.krishnan` / `Nodal@Zone1` |
-| Manufacturer | Phone OTP | `MFR91_YYYY_XXXX` | Any mobile + OTP `1234` |
-| Consumer | Phone OTP | `CTZN91_YYYY_XXXX` | Any mobile + OTP `1234` |
+| Role | Auth Method | User ID Format |
+|------|------------|---------------|
+| Admin | Email + Password | `admin` |
+| Inspector | Email + Password | `rajesh.agarwal` |
+| Supervisor | Email + Password | `meera.krishnan` |
+| Manufacturer | Phone OTP | `MFR91_YYYY_XXXX` |
+| Consumer | Phone OTP | `CTZN91_YYYY_XXXX` |
 
-## Demo Mode
+## Authentication Configuration
 
-`CONFIG.DEMO_MODE = true` in `frontend/js/config.js`. All API calls fall back to mock data.
-Set to `false` in production after deploying the FastAPI backend.
+Authentication is managed via official departmental credentials and verified Phone OTP.
 
 ## Code Quality
 

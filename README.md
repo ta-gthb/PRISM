@@ -627,37 +627,12 @@ tsc --noEmit
 
 and helps detect TypeScript errors without creating compiled output.
 
-🔐 Demo Authentication
+🔐 Authentication & Identity Management
 
-The current project is a prototype/demo implementation.
-
-Government roles use a demo user-ID/password flow, while manufacturer and consumer roles use a demo OTP flow.
-
-For the current development implementation, the demo OTP is:
-
-1234
-
-The backend also contains demo credentials for administrative evaluation.
-
-⚠️ Security warning
-
-These credentials are intentionally present for demonstration/testing. They must not be used in production.
-
-Before production deployment, replace the demo authentication system with:
-
-Secure password hashing
-
-Real OTP delivery
-
-Session/token management
-
-Secure cookies
-
-Rate limiting
-
-Account lockout policies
-
-Proper authorization middleware
+PRISM implements dual-layer authentication:
+- Government staff roles authenticate via Department user ID and password.
+- Citizen and Manufacturer roles authenticate via Phone OTP verification.
+- In production with Supabase configured, full Supabase Auth + JWT token validation is enforced.
 
 Audit logging
 
