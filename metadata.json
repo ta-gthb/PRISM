@@ -1,0 +1,6 @@
+{
+  "name": "PRISM",
+  "description": "Packaged Rules Inspection & Scanning Mechanism — AI-powered compliance inspection and pre-compliance system for Legal Metrology (Packaged Commodities) Rules, 2011.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

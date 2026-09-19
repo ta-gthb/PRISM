@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: prism-api
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: singapore
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: TESSERACT_CMD
+        value: /usr/bin/tesseract
+      - key: LABEL_BUCKET
+        value: label-images
+      - key: REPORTS_BUCKET
+        value: compliance-reports

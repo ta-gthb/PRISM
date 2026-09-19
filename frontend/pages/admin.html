@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>System Administrator — PRISM (Packaged Rules Inspection &amp; Scanning Mechanism)</title>
+  <link rel="stylesheet" href="../css/styles.css" />
+  <script>window.__ENV__ = { SUPABASE_URL: "%VITE_SUPABASE_URL%", SUPABASE_ANON_KEY: "%VITE_SUPABASE_ANON_KEY%", API_BASE_URL: "%VITE_API_BASE_URL%" };</script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    .section { display: none; }
+    .section.active { display: block; }
+    .table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .table th { padding: 10px 14px; text-align: left; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--parchment); }
+    .table td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .table tr:last-child td { border-bottom: none; }
+    .table tbody tr:hover { background: var(--navy-50); }
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; font-family: var(--font-mono); }
+    .badge-compliant { background: var(--compliant-bg); color: var(--compliant); }
+    .badge-violation { background: var(--violation-bg); color: var(--violation); }
+    .badge-warning   { background: var(--warning-bg);   color: var(--warning); }
+    .badge-navy      { background: var(--navy-100);     color: var(--navy-800); }
+    .badge-amber     { background: var(--amber-100);    color: var(--amber-700); }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; backdrop-filter: blur(4px); align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--bg-card); border-radius: var(--radius-xl); padding: 28px; width: 480px; max-width: 95vw; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .modal-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+    .modal-close { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--parchment-dark); cursor: pointer; border: none; font-size: 16px; color: var(--text-muted); }
+    .modal-close:hover { background: var(--border); }
+    .rule-coverage { display: flex; flex-direction: column; gap: 10px; }
+    .rule-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--parchment); border-radius: var(--radius-sm); }
+    .rule-code { font-family: var(--font-mono); font-size: 12px; font-weight: 600; width: 120px; flex-shrink: 0; }
+    .rule-desc { flex: 1; font-size: 12px; color: var(--text-muted); }
+    .rule-status { flex-shrink: 0; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .status-dot.operational { background: #34d399; }
+    .status-dot.warning { background: #f59e0b; }
+    .status-dot.error { background: #dc2626; }
+    .log-line { font-family: var(--font-mono); font-size: 12px; padding: 6px 12px; border-radius: 4px; margin-bottom: 4px; line-height: 1.5; }
+    .log-line.info  { background: var(--navy-50); color: var(--navy-800); }
+    .log-line.warn  { background: var(--amber-50); color: var(--amber-700); }
+    .log-line.error { background: var(--violation-bg); color: var(--violation); }
+    .log-line.success { background: var(--compliant-bg); color: var(--compliant); }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 960px) { .two-col { grid-template-columns: 1fr; } }
+    .pagination { display: flex; align-items: center; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--border); justify-content: flex-end; }
+    .page-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); font-size: 12px; cursor: pointer; }
+    .page-btn.active { background: var(--navy-900); color: #fff; border-color: var(--navy-900); }
+    .greeting-banner { background: linear-gradient(135deg, var(--navy-900) 0%, var(--navy-800) 100%); border-radius: var(--radius-lg); padding: 24px 28px; color: #fff; margin-bottom: 24px; position: relative; overflow: hidden; }
+    .greeting-banner::before { content: ''; position: absolute; right: -20px; top: -20px; width: 140px; height: 140px; background: rgba(255,255,255,0.04); border-radius: 50%; }
+    .greeting-title { font-family: var(--font-display); font-size: 22px; font-weight: 600; }
+    .greeting-sub { font-size: 13px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+    .system-metric { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .system-metric:last-child { border-bottom: none; }
+    .settings-group { margin-bottom: 28px; }
+    .settings-group-title { font-family: var(--font-display); font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text-base); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- ── Sidebar ─────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M10 2L3 6v4c0 4 3.5 7.5 7 8.5C17.5 17.5 17 14 17 10V6l-7-4z" fill="white" opacity=".9"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sidebar-brand-name">PRISM (Packaged Rules Inspection &amp; Scanning Mechanism)</div>
+        <div class="sidebar-brand-sub">COMPLY v2.1</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Administration</span>
+      <button class="nav-item active" data-page="dashboard" onclick="showSection('dashboard', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><rect x="2" y="2" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4"/><rect x="10" y="2" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="10" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4"/><rect x="10" y="10" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" data-page="users" onclick="showSection('users', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><circle cx="7" cy="6" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M1 16c0-3.3 2.7-6 6-6"/><circle cx="13" cy="13" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M13 11v2l1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        User Management
+      </button>
+      <button class="nav-item" data-page="rules" onclick="showSection('rules', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><path d="M3 3h12v3H3zM3 9h9M3 14h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="14" cy="13" r="2.5" stroke="currentColor" stroke-width="1.2"/></svg>
+        Rule Engine
+      </button>
+      <button class="nav-item" data-page="logs" onclick="showSection('logs', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><path d="M3 4h12M3 9h12M3 14h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        System Logs
+      </button>
+      <button class="nav-item" data-page="settings" onclick="showSection('settings', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><circle cx="9" cy="9" r="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M9 2v1.5M9 14.5V16M2 9h1.5M14.5 9H16M4.1 4.1l1.1 1.1M12.8 12.8l1.1 1.1M4.1 13.9l1.1-1.1M12.8 5.2l1.1-1.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Settings
+      </button>
+      <button class="nav-item" data-page="profile" onclick="showSection('profile', this)">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><circle cx="9" cy="6" r="3.5" stroke="currentColor" stroke-width="1.4"/><path d="M2 16c0-3.314 3.134-6 7-6s7 2.686 7 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        My Profile
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="nav-item" onclick="logout()" style="margin-bottom:10px;">
+        <svg class="nav-icon" fill="none" viewBox="0 0 18 18"><path d="M12 12l4-4-4-4M16 9H7M10 3H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Log Out
+      </button>
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sidebar-avatar">SA</div>
+        <div>
+          <div class="sidebar-user-name" id="sidebar-user-name">Loading…</div>
+          <div class="sidebar-user-role" id="sidebar-user-role">Administrator</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ───────────────────────────── -->
+  <main class="main-content">
+    <div class="page-header">
+      <h1 class="page-title" id="page-title">System Administrator</h1>
+      <p class="page-subtitle" id="page-subtitle">Manage users, rules, and system configuration</p>
+    </div>
+
+    <div class="page-body">
+
+      <!-- Dashboard Section -->
+      <div id="section-dashboard" class="section active">
+        <div class="greeting-banner">
+          <div class="greeting-title" id="greeting-text">Good morning, Administrator</div>
+          <div class="greeting-sub" id="greeting-date">Loading…</div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-card" style="--stat-accent: var(--navy-600)">
+            <div class="stat-value" id="stat-total-users">—</div>
+            <div class="stat-label">Total Users</div>
+            <div class="stat-delta up" id="stat-total-users-sub">Live database data</div>
+          </div>
+          <div class="stat-card" style="--stat-accent: var(--amber-600)">
+            <div class="stat-value" id="stat-inspectors">—</div>
+            <div class="stat-label">Field Inspectors / Enforcement Officers</div>
+            <div class="stat-delta up" id="stat-inspectors-sub">Active: —</div>
+          </div>
+          <div class="stat-card" style="--stat-accent: var(--compliant)">
+            <div class="stat-value" id="stat-supervisors">—</div>
+            <div class="stat-label">Supervisors / Nodal Officers</div>
+            <div class="stat-delta up" id="stat-supervisors-sub">Active: —</div>
+          </div>
+          <div class="stat-card" style="--stat-accent: #34d399">
+            <div class="stat-value" id="stat-jurisdiction" style="font-size:22px;">—</div>
+            <div class="stat-label">State Jurisdiction</div>
+            <div class="stat-delta up" id="stat-jurisdiction-sub">Active &amp; Operational</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><span class="card-title">System Health &amp; Enforcement</span></div>
+            <div class="card-body" id="system-health">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">User Role Distribution</span></div>
+            <div class="card-body" id="role-distribution">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header">
+            <span class="card-title">Recent Staff Accounts in Jurisdiction</span>
+            <button class="btn btn-amber btn-sm" onclick="showSection('users', document.querySelector('[data-page=users]'))">Manage Users →</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="table">
+              <thead>
+                <tr><th>User ID</th><th>Name</th><th>Role</th><th>State</th><th>Status</th><th>Joined</th></tr>
+              </thead>
+              <tbody id="recent-users-body">
+                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Management Section -->
+      <div id="section-users" class="section">
+        <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
+          <button class="btn btn-amber" onclick="openCreateUserModal()">+ Create User</button>
+          <input class="form-input" style="width:200px;padding:8px 12px;font-size:12px;" placeholder="Search users…" oninput="filterUsers(this.value)" />
+          <select class="form-input" style="width:220px;padding:8px 12px;font-size:12px;" onchange="filterUsersByRole(this.value)">
+            <option value="">All Staff Roles</option>
+            <option value="inspector">Field Inspector / Enforcement Officer</option>
+            <option value="supervisor">Supervisor / Nodal Officer</option>
+          </select>
+          <span class="badge badge-navy" id="users-jurisdiction-badge" style="margin-left:auto;font-size:12px;padding:6px 12px;">Jurisdiction: Loading…</span>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Jurisdiction Staff Accounts</span>
+            <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);" id="user-count">—</span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="table">
+              <thead>
+                <tr><th>User ID</th><th>Name</th><th>Role</th><th>State</th><th>Email</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="users-body">
+                <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination">
+            <span style="font-size:12px;color:var(--text-muted);">Showing 3 of 23</span>
+            <button class="page-btn active">1</button>
+            <button class="page-btn">2</button>
+            <button class="page-btn">›</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rule Engine Section -->
+      <div id="section-rules" class="section">
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header">
+            <span class="card-title">LM (PC) Rules 2011 — Coverage Status</span>
+            <span class="badge badge-navy">Backend-managed rules</span>
+          </div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+              Rule coverage is enforced by the deployed compliance service. Configuration changes require an audited backend release.
+            </p>
+            <div class="rule-coverage" id="rule-coverage">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><span class="card-title">AI Model Status</span></div>
+            <div class="card-body">
+              <div class="system-metric"><span>Operational metrics</span><span style="font-family:var(--font-mono);">Available from live dashboards</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="card-title">Rule Engine Config</span>
+              <span class="badge badge-navy" id="rules-state-badge">Jurisdiction: Loading…</span>
+            </div>
+            <div class="card-body">
+              <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
+                Configure compliance threshold values applied to inspections in your assigned state jurisdiction.
+              </p>
+              <div class="form-group">
+                <label class="form-label">Critical Threshold Score (Scores below this trigger Critical Non-compliance)</label>
+                <input class="form-input" id="rule-critical-threshold" type="number" value="40" min="0" max="100" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Compliant / Major Threshold (Scores at or above this mark are Compliant)</label>
+                <input class="form-input" id="rule-major-threshold" type="number" value="65" min="0" max="100" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Auto-flag Products Below Score (Scores below this trigger Partial review)</label>
+                <input class="form-input" id="rule-autoflag-threshold" type="number" value="50" min="0" max="100" />
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;">
+                <span id="rules-last-saved" style="font-size:11px;color:var(--text-muted);">State-scoped rule thresholds</span>
+                <button class="btn btn-primary" onclick="saveRuleThresholds()">Save Configuration</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Logs Section -->
+      <div id="section-logs" class="section">
+        <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+          <select class="form-input" style="width:140px;padding:8px 12px;font-size:12px;">
+            <option>All Levels</option><option>INFO</option><option>WARNING</option><option>ERROR</option>
+          </select>
+          <input type="date" class="form-input" style="width:160px;padding:8px 12px;font-size:12px;" />
+          <button class="btn btn-outline btn-sm" onclick="loadLogs()">↻ Refresh</button>
+          <button class="btn btn-ghost btn-sm" onclick="showToast('Exporting logs…','info')">↓ Export</button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">System Event Log</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);" id="log-time">Last updated: just now</span>
+          </div>
+          <div class="card-body" id="system-logs" style="max-height:500px;overflow-y:auto;">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Section -->
+      <div id="section-settings" class="section">
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Application Settings</span></div>
+            <div class="card-body">
+              <div class="settings-group">
+                <div class="settings-group-title">Platform</div>
+                <div class="form-group">
+                  <label class="form-label">App Name</label>
+                  <input class="form-input" type="text" value="PRISM (Packaged Rules Inspection &amp; Scanning Mechanism)" readonly />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">API Base URL</label>
+                  <input class="form-input" type="text" placeholder="Configured through Render environment variables" readonly />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Environment</label>
+                  <select class="form-input">
+                    <option>Production</option>
+                    <option>Staging</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-group">
+                <div class="settings-group-title">Notifications</div>
+                <div class="form-group">
+                  <label class="form-label">Alert Email</label>
+                  <input class="form-input" type="email" placeholder="admin@doca.gov.in" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Critical Violation Alerts</label>
+                  <select class="form-input">
+                    <option>Immediate</option>
+                    <option>Hourly Digest</option>
+                    <option>Daily Digest</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn btn-amber" onclick="showToast('Settings saved successfully.', 'success')">Save Settings</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Supabase / Database</span></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Supabase Project URL</label>
+                <input class="form-input" type="text" placeholder="https://xxx.supabase.co" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Anon Key</label>
+                <input class="form-input" type="password" placeholder="eyJ…" />
+              </div>
+              <button class="btn btn-outline" style="margin-bottom:12px;" onclick="testConnection()">Test Connection</button>
+              <div style="margin-top:16px;">
+                <div class="settings-group-title">Backup & Restore</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="btn btn-outline btn-sm" onclick="showToast('Starting backup…','info')">Manual Backup</button>
+                  <button class="btn btn-ghost btn-sm" onclick="showToast('Contact your database administrator to restore from backup.','info')">Restore</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile Section -->
+      <div id="section-profile" class="section">
+        <div class="two-col" style="max-width:980px;">
+          <!-- Administrative Details (Read-only) -->
+          <div class="card">
+            <div class="card-header" style="display:flex;align-items:center;gap:16px;">
+              <div id="profile-avatar-lg" style="width:56px;height:56px;border-radius:50%;background:var(--navy-900);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:22px;font-weight:700;flex-shrink:0;">SA</div>
+              <div>
+                <div id="profile-name-display" style="font-family:var(--font-display);font-size:20px;font-weight:600;">Loading…</div>
+                <div id="profile-role-display" style="font-size:13px;color:var(--text-muted);margin-top:2px;">System Administrator</div>
+              </div>
+            </div>
+            <div class="card-body">
+              <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Official government jurisdiction profile (fixed administrative record).</div>
+              <div id="profile-fields-grid" style="display:grid;grid-template-columns:1fr;gap:10px;"></div>
+            </div>
+          </div>
+
+          <!-- Edit Login Email & Password -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Login Credentials</span>
+            </div>
+            <div class="card-body">
+              <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+                You can edit your registered login email ID and login password for accessing the system.
+              </p>
+              <form onsubmit="submitAdminCredentials(event)">
+                <div class="form-group">
+                  <label class="form-label">Registered Login Email ID</label>
+                  <input class="form-input" id="admin-profile-email" type="email" required placeholder="admin@doca.gov.in" />
+                </div>
+                <div class="form-group">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <label class="form-label" style="margin-bottom:0;">New Login Password</label>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="generateAdminProfilePassword()" style="font-size:11px;padding:2px 8px;">Generate Password</button>
+                  </div>
+                  <div style="position:relative;">
+                    <input class="form-input" id="admin-profile-new-password" type="password" placeholder="Leave blank to keep current password" minlength="8" style="padding-right:72px;" />
+                    <button type="button" id="toggle-admin-pw-btn" class="btn btn-ghost btn-sm" onclick="togglePassVisibility('admin-profile-new-password', this)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:11px;padding:3px 8px;">Show</button>
+                  </div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Minimum 8 characters. Must contain letters, digits, or symbols.</div>
+                </div>
+                <div class="form-group">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <label class="form-label" style="margin-bottom:0;">Current Password <span style="color:var(--violation);font-weight:700;">*</span></label>
+                  </div>
+                  <div style="position:relative;">
+                    <input class="form-input" id="admin-profile-curr-password" type="password" required placeholder="Enter current password to authorize changes" style="padding-right:72px;" />
+                    <button type="button" id="toggle-admin-curr-pw-btn" class="btn btn-ghost btn-sm" onclick="togglePassVisibility('admin-profile-curr-password', this)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:11px;padding:3px 8px;">Show</button>
+                  </div>
+                  <div style="font-size:11px;color:var(--violation);margin-top:4px;font-weight:500;">Mandatory: Enter your current login password to verify identity and authorize changes.</div>
+                </div>
+                <div style="display:flex;justify-content:flex-end;margin-top:20px;">
+                  <button type="submit" class="btn btn-amber" id="save-admin-cred-btn">Update Login Credentials</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Create User Modal -->
+<div class="modal-overlay" id="create-user-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Create New Staff User</span>
+      <button class="modal-close" onclick="closeCreateUserModal()">✕</button>
+    </div>
+    <form onsubmit="submitCreateUser(event)">
+      <div class="form-group">
+        <label class="form-label">User Role</label>
+        <select class="form-input" id="new-user-role" required>
+          <option value="inspector">Field Inspector / Enforcement Officer</option>
+          <option value="supervisor">Supervisor / Nodal Officer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label class="form-label">First Name</label>
+            <input class="form-input" id="new-user-first-name" type="text" placeholder="e.g. Rajesh" required />
+          </div>
+          <div>
+            <label class="form-label">Last Name</label>
+            <input class="form-input" id="new-user-last-name" type="text" placeholder="e.g. Agarwal" required />
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div style="background:var(--parchment);padding:10px 14px;border-radius:6px;border:1px solid var(--border);font-size:12px;color:var(--text-base);">
+          <strong>Assigned State / Zone:</strong> <span id="create-modal-state-badge" style="font-weight:600;color:var(--navy-900);">Delhi</span>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">(Auto-allotted based on System Administrator assigned state jurisdiction)</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">User ID</label>
+        <input class="form-input" id="new-user-id" type="text" placeholder="e.g. INSP-DELHI-04" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Official Email Address</label>
+        <input class="form-input" id="new-user-email" type="email" placeholder="user@doca.gov.in" required />
+      </div>
+      <div class="form-group">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label class="form-label" style="margin-bottom:0;">Password</label>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="generateUserPassword('new-user-password', 'toggle-pw-btn')" style="font-size:11px;padding:2px 8px;">Generate Password</button>
+        </div>
+        <div style="position:relative;">
+          <input class="form-input" id="new-user-password" type="password" placeholder="Min. 8 characters" minlength="8" required style="padding-right:72px;" />
+          <button type="button" id="toggle-pw-btn" class="btn btn-ghost btn-sm" onclick="togglePassVisibility('new-user-password', this)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:11px;padding:3px 8px;">Show</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Initial login password for staff member.</div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+        <button type="button" class="btn btn-ghost" onclick="closeCreateUserModal()">Cancel</button>
+        <button type="submit" class="btn btn-amber">Create User</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal-overlay" id="edit-user-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Edit User Account</span>
+      <button class="modal-close" onclick="closeEditUserModal()">✕</button>
+    </div>
+    <form onsubmit="submitEditUser(event)">
+      <input type="hidden" id="edit-user-db-id" />
+      <div class="form-group">
+        <label class="form-label">User ID</label>
+        <input class="form-input" id="edit-user-id" type="text" disabled style="opacity:0.75;cursor:not-allowed;" />
+      </div>
+      <div class="form-group">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label class="form-label">First Name</label>
+            <input class="form-input" id="edit-user-first-name" type="text" required />
+          </div>
+          <div>
+            <label class="form-label">Last Name</label>
+            <input class="form-input" id="edit-user-last-name" type="text" required />
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-input" id="edit-user-role" required>
+          <option value="inspector">Field Inspector / Enforcement Officer</option>
+          <option value="supervisor">Supervisor / Nodal Officer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">State Jurisdiction (Auto-allotted)</label>
+        <input class="form-input" id="edit-user-state" type="text" disabled style="opacity:0.75;cursor:not-allowed;" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Account Status</label>
+        <select class="form-input" id="edit-user-status">
+          <option value="active">Active (Access Enabled)</option>
+          <option value="inactive">Inactive (Access Disabled)</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+        <button type="button" class="btn btn-ghost" onclick="closeEditUserModal()">Cancel</button>
+        <button type="submit" class="btn btn-amber">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-overlay" id="reset-password-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Edit User Password</span>
+      <button class="modal-close" onclick="closeResetPasswordModal()">✕</button>
+    </div>
+    <form onsubmit="submitResetPassword(event)">
+      <input type="hidden" id="reset-pw-user-id" />
+      <div class="form-group">
+        <div style="background:var(--parchment);padding:10px 14px;border-radius:6px;border:1px solid var(--border);font-size:13px;color:var(--text-base);margin-bottom:6px;">
+          <div><strong>Target Account:</strong> <span id="reset-pw-target-name">—</span></div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-top:2px;">User ID: <span id="reset-pw-target-uid">—</span></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label class="form-label" style="margin-bottom:0;">New Password</label>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="generateUserPassword('reset-user-new-password', 'toggle-reset-pw-btn')" style="font-size:11px;padding:2px 8px;">Generate Password</button>
+        </div>
+        <div style="position:relative;">
+          <input class="form-input" id="reset-user-new-password" type="password" placeholder="Min. 8 characters" minlength="8" required style="padding-right:72px;" />
+          <button type="button" id="toggle-reset-pw-btn" class="btn btn-ghost btn-sm" onclick="togglePassVisibility('reset-user-new-password', this)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:11px;padding:3px 8px;">Show</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">This password will immediately overwrite the user's login credential.</div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+        <button type="button" class="btn btn-ghost" onclick="closeResetPasswordModal()">Cancel</button>
+        <button type="submit" class="btn btn-amber">Update Password</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+  function getRoleDisplay(role) {
+    const map = { inspector: 'Field Inspector', supervisor: 'Supervisor', admin: 'Administrator', manufacturer: 'Manufacturer', consumer: 'Consumer' };
+    return map[role] || role;
+  }
+
+  function showSection(id, navEl) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('section-' + id)?.classList.add('active');
+    navEl?.classList.add('active');
+    const titles = { dashboard: 'System Administrator', users: 'User Management', rules: 'Rule Engine', logs: 'System Logs', settings: 'Settings', profile: 'My Profile' };
+    document.getElementById('page-title').textContent = titles[id] || 'Administrator';
+    if (id === 'logs') loadLogs();
+    if (id === 'rules') loadRules();
+    if (id === 'users') loadUsers();
+    if (id === 'profile') loadProfile();
+  }
+
+  function loadProfile() {
+    const session = getSession();
+    if (!session) return;
+    const name = session.name || session.userId || 'Admin';
+    const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    document.getElementById('profile-avatar-lg').textContent = initials;
+    document.getElementById('profile-name-display').textContent = name;
+    document.getElementById('profile-role-display').textContent = 'System Administrator · ' + (session.userId || '');
+    const fields = [
+      { label: 'Admin User ID', value: session.userId || '—' },
+      { label: 'Administrative Role', value: 'System Administrator' },
+      { label: 'Assigned State / Jurisdiction', value: session.state || 'Delhi (National Capital Territory)' },
+      { label: 'Government Organization', value: session.organization || 'Department of Consumer Affairs (DoCA)' },
+      { label: 'Official Designation', value: session.designation || 'System Administrator (LMPC Enforcement)' },
+    ];
+    document.getElementById('profile-fields-grid').innerHTML = fields.map(f => `
+      <div style="background:var(--parchment);border-radius:8px;padding:12px 14px;border:1px solid var(--border);">
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">${f.label}</div>
+        <div style="font-size:14px;font-weight:500;margin-top:4px;word-break:break-all;color:var(--text-base);">${f.value}</div>
+      </div>
+    `).join('');
+
+    const emailInput = document.getElementById('admin-profile-email');
+    if (emailInput && !emailInput.value) {
+      emailInput.value = session.email || (session.userId + '@doca.gov.in');
+    }
+  }
+
+  function generateAdminProfilePassword() {
+    generateUserPassword('admin-profile-new-password', 'toggle-admin-pw-btn');
+  }
+
+  async function submitAdminCredentials(e) {
+    e.preventDefault();
+    const email = document.getElementById('admin-profile-email').value.trim();
+    const newPassword = document.getElementById('admin-profile-new-password').value;
+    const currentPassword = document.getElementById('admin-profile-curr-password').value.trim();
+    const btn = document.getElementById('save-admin-cred-btn');
+
+    if (!currentPassword) {
+      showToast('Current password is mandatory to authorize credential changes.', 'error');
+      document.getElementById('admin-profile-curr-password').focus();
+      return;
+    }
+
+    if (newPassword && newPassword.length < 8) {
+      showToast('New password must be at least 8 characters.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      const payload = { email, current_password: currentPassword };
+      if (newPassword) payload.password = newPassword;
+
+      const res = await API.updateCredentials(payload);
+      showToast(res.message || 'Login credentials updated successfully!', 'success');
+
+      // Update session email
+      const session = getSession();
+      if (session) {
+        session.email = email;
+        try { localStorage.setItem('prism_auth', JSON.stringify(session)); } catch (_) {}
+      }
+
+      document.getElementById('admin-profile-new-password').value = '';
+      document.getElementById('admin-profile-curr-password').value = '';
+    } catch (err) {
+      showToast('Error: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Update Login Credentials';
+    }
+  }
+
+  function openCreateUserModal() {
+    const session = getSession();
+    const badge = document.getElementById('create-modal-state-badge');
+    if (badge) badge.textContent = (session && session.state) ? session.state : 'Delhi';
+    document.getElementById('create-user-modal').classList.add('open');
+  }
+  function closeCreateUserModal() { document.getElementById('create-user-modal').classList.remove('open'); }
+
+  function openEditUserModal(id) {
+    const u = cachedUsers.find(x => String(x.id) === String(id) || String(x.user_id) === String(id));
+    if (!u) return;
+    document.getElementById('edit-user-db-id').value = u.id;
+    document.getElementById('edit-user-id').value = u.user_id;
+
+    const parts = (u.name || '').trim().split(' ');
+    document.getElementById('edit-user-first-name').value = u.first_name || parts[0] || '';
+    document.getElementById('edit-user-last-name').value = u.last_name || parts.slice(1).join(' ') || '';
+    document.getElementById('edit-user-role').value = u.role === 'supervisor' ? 'supervisor' : 'inspector';
+    document.getElementById('edit-user-state').value = u.state || (getSession()?.state || 'Delhi');
+    document.getElementById('edit-user-status').value = u.is_active ? 'active' : 'inactive';
+    document.getElementById('edit-user-modal').classList.add('open');
+  }
+  function closeEditUserModal() {
+    document.getElementById('edit-user-modal').classList.remove('open');
+  }
+
+  async function submitEditUser(e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-user-db-id').value;
+    const firstName = document.getElementById('edit-user-first-name').value.trim();
+    const lastName = document.getElementById('edit-user-last-name').value.trim();
+    const body = {
+      first_name: firstName,
+      last_name: lastName,
+      name: `${firstName} ${lastName}`.trim(),
+      role: document.getElementById('edit-user-role').value,
+      is_active: document.getElementById('edit-user-status').value === 'active',
+    };
+    try {
+      await API.updateUser(id, body);
+      showToast('User account updated successfully!', 'success');
+      closeEditUserModal();
+      loadUsers();
+      loadDashboardStats();
+    } catch (err) {
+      showToast('Error updating user: ' + err.message, 'error');
+    }
+  }
+
+  function openResetPasswordModal(id, name, userId) {
+    document.getElementById('reset-pw-user-id').value = id;
+    document.getElementById('reset-pw-target-name').textContent = name || userId;
+    document.getElementById('reset-pw-target-uid').textContent = userId;
+    document.getElementById('reset-user-new-password').value = '';
+    document.getElementById('reset-password-modal').classList.add('open');
+  }
+  function closeResetPasswordModal() {
+    document.getElementById('reset-password-modal').classList.remove('open');
+  }
+
+  async function submitResetPassword(e) {
+    e.preventDefault();
+    const id = document.getElementById('reset-pw-user-id').value;
+    const newPassword = document.getElementById('reset-user-new-password').value;
+    if (!newPassword || newPassword.length < 8) {
+      showToast('Password must be at least 8 characters.', 'error');
+      return;
+    }
+    try {
+      await API.updateUser(id, { password: newPassword });
+      showToast('User password updated successfully!', 'success');
+      closeResetPasswordModal();
+    } catch (err) {
+      showToast('Failed to update password: ' + err.message, 'error');
+    }
+  }
+
+  function generateUserPassword(inputId = 'new-user-password', toggleBtnId = 'toggle-pw-btn') {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const special = '!@#$%&*';
+    const all = upper + lower + digits + special;
+    let pw = '';
+    pw += upper.charAt(Math.floor(Math.random() * upper.length));
+    pw += lower.charAt(Math.floor(Math.random() * lower.length));
+    pw += digits.charAt(Math.floor(Math.random() * digits.length));
+    pw += special.charAt(Math.floor(Math.random() * special.length));
+    for (let i = pw.length; i < 12; i++) {
+      pw += all.charAt(Math.floor(Math.random() * all.length));
+    }
+    pw = pw.split('').sort(() => 0.5 - Math.random()).join('');
+    const input = document.getElementById(inputId);
+    if (input) {
+      input.value = pw;
+      input.type = 'text';
+    }
+    const btn = document.getElementById(toggleBtnId);
+    if (btn) btn.textContent = 'Hide';
+    showToast('Secure password generated and revealed', 'info');
+  }
+
+  function togglePassVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    if (input.type === 'password') {
+      input.type = 'text';
+      if (btn) btn.textContent = 'Hide';
+    } else {
+      input.type = 'password';
+      if (btn) btn.textContent = 'Show';
+    }
+  }
+
+  async function submitCreateUser(e) {
+    e.preventDefault();
+    const password = document.getElementById('new-user-password').value;
+    if (!password || password.length < 8) {
+      showToast('Password must be at least 8 characters.', 'error');
+      return;
+    }
+    const firstName = document.getElementById('new-user-first-name').value.trim();
+    const lastName = document.getElementById('new-user-last-name').value.trim();
+    const body = {
+      user_id: document.getElementById('new-user-id').value.trim(),
+      first_name: firstName,
+      last_name: lastName,
+      name: `${firstName} ${lastName}`.trim(),
+      role: document.getElementById('new-user-role').value,
+      email: document.getElementById('new-user-email').value.trim(),
+      password: password,
+    };
+    try {
+      await API.createUser(body);
+      showToast('Staff user created successfully!', 'success');
+      closeCreateUserModal();
+      document.getElementById('new-user-id').value = '';
+      document.getElementById('new-user-first-name').value = '';
+      document.getElementById('new-user-last-name').value = '';
+      document.getElementById('new-user-email').value = '';
+      document.getElementById('new-user-password').value = '';
+      loadUsers();
+      loadDashboardStats();
+    } catch(err) {
+      showToast('Error: ' + err.message, 'error');
+    }
+  }
+
+  const roleBadge = r => {
+    const map = { admin: 'badge-violation', inspector: 'badge-navy', supervisor: 'badge-amber', manufacturer: 'badge-warning', consumer: 'badge-compliant' };
+    const labelMap = { inspector: 'Enforcement Officer', supervisor: 'Supervisor' };
+    return `<span class="badge ${map[r]||'badge-navy'}">${labelMap[r] || r}</span>`;
+  };
+
+  function isCurrentUser(u) {
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session) return false;
+    const sUid = String(session.userId || session.user_id || '').trim().toLowerCase();
+    const sEmail = String(session.email || '').trim().toLowerCase();
+    const sId = String(session.id || '').trim();
+
+    const targetUid = String(u.user_id || '').trim().toLowerCase();
+    const targetEmail = String(u.email || '').trim().toLowerCase();
+    const targetId = String(u.id || '').trim();
+
+    if (sUid && targetUid && sUid === targetUid) return true;
+    if (sEmail && targetEmail && sEmail === targetEmail) return true;
+    if (sId && targetId && sId === targetId) return true;
+    return false;
+  }
+
+  let cachedUsers = [];
+
+  async function loadUsers() {
+    const tbody = document.getElementById('users-body');
+    const rbody = document.getElementById('recent-users-body');
+    const session = getSession();
+    const stateBadge = document.getElementById('users-jurisdiction-badge');
+    if (stateBadge) stateBadge.textContent = 'Jurisdiction: ' + (session?.state || 'Assigned State');
+
+    try {
+      const data = await API.getUsers('exclude_self=true');
+      const allItems = data.items || [];
+      // Strictly exclude administrator's own account so they never view or self-delete their own record
+      cachedUsers = allItems.filter(u => !isCurrentUser(u));
+
+      const countEl = document.getElementById('user-count');
+      if (countEl) countEl.textContent = `${cachedUsers.length} staff accounts`;
+
+      if (cachedUsers.length === 0) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px;">No staff accounts found in this state. Click "+ Create User" to provision an enforcement officer or supervisor.</td></tr>';
+        if (rbody) rbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:16px;">No staff records available.</td></tr>';
+        return;
+      }
+
+      const rows = cachedUsers.map(u => `
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px;font-weight:600;">${u.user_id}</td>
+          <td style="font-weight:500;">${u.name || (u.first_name + ' ' + (u.last_name || '')).trim()}</td>
+          <td>${roleBadge(u.role)}</td>
+          <td><span class="badge badge-outline" style="font-size:11px;">${u.state || session?.state || '—'}</span></td>
+          <td style="font-size:12px;color:var(--text-muted);">${u.email}</td>
+          <td><span class="badge ${u.is_active ? 'badge-compliant' : 'badge-violation'}">${u.is_active ? 'Active' : 'Disabled'}</span></td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">${fmtDate(u.created_at)}</td>
+          <td>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button class="btn btn-outline btn-sm" onclick="openResetPasswordModal('${u.id}', '${escapeHtml(u.name || u.user_id)}', '${u.user_id}')" title="Edit / Reset password" style="font-size:11px;padding:3px 8px;">🔑 Password</button>
+              <button class="btn btn-ghost btn-sm" onclick="openEditUserModal('${u.id}')" style="font-size:11px;padding:3px 8px;">Edit</button>
+              <button class="btn ${u.is_active ? 'btn-ghost' : 'btn-amber'} btn-sm" onclick="confirmDisable('${u.id}', '${u.user_id}', ${u.is_active})" style="font-size:11px;padding:3px 8px;">
+                ${u.is_active ? 'Disable' : 'Activate'}
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="confirmDeleteUser('${u.id}', '${u.user_id}')" style="font-size:11px;padding:3px 8px;">Delete</button>
+            </div>
+          </td>
+        </tr>`
+      );
+      if (tbody) tbody.innerHTML = rows.join('');
+      if (rbody) rbody.innerHTML = cachedUsers.slice(0, 5).map(u => `
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px;">${u.user_id}</td>
+          <td style="font-weight:500;">${u.name || (u.first_name + ' ' + (u.last_name || '')).trim()}</td>
+          <td>${roleBadge(u.role)}</td>
+          <td>${u.state || session?.state || '—'}</td>
+          <td><span class="badge ${u.is_active ? 'badge-compliant' : 'badge-violation'}">${u.is_active ? 'Active' : 'Disabled'}</span></td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">${fmtDate(u.created_at)}</td>
+        </tr>`
+      ).join('');
+    } catch(e) {
+      if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">Could not load users.</td></tr>';
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function filterUsers(q) {
+    document.querySelectorAll('#users-body tr').forEach(r =>
+      r.style.display = r.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none'
+    );
+  }
+  function filterUsersByRole(role) {
+    document.querySelectorAll('#users-body tr').forEach(r =>
+      r.style.display = (!role || r.textContent.toLowerCase().includes(role)) ? '' : 'none'
+    );
+  }
+
+  async function confirmDisable(id, userId, isActive) {
+    if (isCurrentUser({ id, user_id: userId })) {
+      showToast('You cannot disable your own administrator account.', 'error');
+      return;
+    }
+    const action = isActive ? 'disable' : 'activate';
+    if (confirm(`Are you sure you want to ${action} user "${userId}"? ${isActive ? 'They will lose portal access immediately.' : 'Their account access will be restored.'}`)) {
+      try {
+        await API.updateUser(id, { is_active: !isActive });
+        showToast(`User ${userId} ${isActive ? 'disabled' : 'activated'}.`, 'success');
+        loadUsers();
+        loadDashboardStats();
+      } catch (err) { showToast('Error: ' + err.message, 'error'); }
+    }
+  }
+
+  async function confirmDeleteUser(id, userId) {
+    if (isCurrentUser({ id, user_id: userId })) {
+      showToast('You cannot delete your own administrator account.', 'error');
+      return;
+    }
+    if (confirm(`Permanently delete staff user account "${userId}"? This action cannot be undone.`)) {
+      try {
+        await API.deleteUser(id, true);
+        showToast(`User account "${userId}" deleted successfully.`, 'success');
+        loadUsers();
+        loadDashboardStats();
+      } catch (err) {
+        showToast('Failed to delete user: ' + err.message, 'error');
+      }
+    }
+  }
+
+  async function loadRules() {
+    const session = getSession();
+    const stateName = session?.state || 'National / All';
+    const badge = document.getElementById('rules-state-badge');
+    if (badge) badge.textContent = 'Jurisdiction: ' + stateName;
+
+    const RULES = [
+      { code: 'LMPC-R4', desc: 'Declaration of name and address of manufacturer / packer', status: 'active' },
+      { code: 'LMPC-R5', desc: 'Common generic name of the pre-packaged commodity', status: 'active' },
+      { code: 'LMPC-R6', desc: 'Maximum Retail Price (MRP incl. of all taxes), Consumer Care', status: 'active' },
+      { code: 'LMPC-R7', desc: 'Net quantity declaration in standard legal metrology units', status: 'active' },
+      { code: 'LMPC-R8', desc: 'Month and year of manufacture / packing / import', status: 'active' },
+      { code: 'LMPC-R9', desc: 'Batch or lot identification code / number', status: 'active' },
+      { code: 'LMPC-R26', desc: 'Retail pack of food articles & mandatory declarations', status: 'active' },
+      { code: 'LMPC-R34', desc: 'Net quantity expression in grams / millilitres / numbers', status: 'active' },
+    ];
+    document.getElementById('rule-coverage').innerHTML = RULES.map(r => `
+      <div class="rule-row">
+        <div class="rule-code">${r.code}</div>
+        <div class="rule-desc">${r.desc}</div>
+        <div class="rule-status">
+          <span class="badge badge-compliant">
+            <span class="status-dot operational"></span>Active
+          </span>
+        </div>
+      </div>`
+    ).join('');
+
+    try {
+      const thresholds = await API.getRuleThresholds();
+      if (thresholds) {
+        document.getElementById('rule-critical-threshold').value = thresholds.critical_threshold ?? 40;
+        document.getElementById('rule-major-threshold').value = thresholds.major_threshold ?? 65;
+        document.getElementById('rule-autoflag-threshold').value = thresholds.auto_flag_below ?? 50;
+        const lastSaved = document.getElementById('rules-last-saved');
+        if (lastSaved) {
+          lastSaved.textContent = `Applied for jurisdiction: ${thresholds.state || stateName}`;
+        }
+      }
+    } catch (_) {}
+  }
+
+  async function saveRuleThresholds() {
+    const critical = parseInt(document.getElementById('rule-critical-threshold').value, 10);
+    const major = parseInt(document.getElementById('rule-major-threshold').value, 10);
+    const autoflag = parseInt(document.getElementById('rule-autoflag-threshold').value, 10);
+
+    if (isNaN(critical) || isNaN(major) || isNaN(autoflag)) {
+      showToast('Please enter valid numeric scores between 0 and 100.', 'error');
+      return;
+    }
+
+    try {
+      const res = await API.updateRuleThresholds({
+        critical_threshold: critical,
+        major_threshold: major,
+        auto_flag_below: autoflag,
+      });
+      showToast(res.message || 'Rule thresholds saved for your state jurisdiction!', 'success');
+      const lastSaved = document.getElementById('rules-last-saved');
+      if (lastSaved) lastSaved.textContent = `Saved at ${getIST()} IST`;
+    } catch (err) {
+      showToast('Error saving thresholds: ' + err.message, 'error');
+    }
+  }
+
+  async function loadLogs() {
+    const container = document.getElementById('system-logs');
+    try {
+      const data = await API.getAuditLogs();
+      const logs = data.items || [];
+      container.innerHTML = logs.length ? logs.map(l => `<div class="log-line info"><span style="opacity:.5;">[${fmtDateTime(l.created_at)}]</span> <strong>[${l.action}]</strong> ${l.resource}</div>`).join('') : '<p style="color:var(--text-muted)">No audit activity recorded.</p>';
+      document.getElementById('log-time').textContent = 'Last updated: ' + getIST() + ' IST';
+    } catch (error) { container.innerHTML = '<p style="color:var(--violation)">Could not load audit logs.</p>'; }
+  }
+
+  async function testConnection() {
+    try {
+      const result = await API.health();
+      showToast(result.status === 'healthy' ? 'Backend and database are connected.' : 'Backend is reachable but a dependency is unavailable.', result.status === 'healthy' ? 'success' : 'error');
+    } catch (error) { showToast('Connection test failed: ' + error.message, 'error'); }
+  }
+
+  async function loadDashboardStats() {
+    try {
+      const [stats, usersData] = await Promise.all([
+        API.getStats(),
+        API.getUsers('exclude_self=true')
+      ]);
+      const session = getSession();
+      const users = (usersData.items || []).filter(u => !isCurrentUser(u));
+
+      // Calculate live real DB metrics
+      const totalUsers = stats.total_users !== undefined ? stats.total_users : users.length;
+      const totalInspectors = stats.total_inspectors !== undefined ? stats.total_inspectors : users.filter(u => u.role === 'inspector').length;
+      const activeInspectors = stats.active_inspectors !== undefined ? stats.active_inspectors : users.filter(u => u.role === 'inspector' && u.is_active).length;
+      const totalSupervisors = stats.total_supervisors !== undefined ? stats.total_supervisors : users.filter(u => u.role === 'supervisor').length;
+      const activeSupervisors = stats.active_supervisors !== undefined ? stats.active_supervisors : users.filter(u => u.role === 'supervisor' && u.is_active).length;
+
+      document.getElementById('stat-total-users').textContent = totalUsers;
+      document.getElementById('stat-total-users-sub').textContent = `${users.filter(u => u.is_active).length} active in state database`;
+
+      document.getElementById('stat-inspectors').textContent = totalInspectors;
+      document.getElementById('stat-inspectors-sub').textContent = `Active in field: ${activeInspectors}`;
+
+      document.getElementById('stat-supervisors').textContent = totalSupervisors;
+      document.getElementById('stat-supervisors-sub').textContent = `Active nodal officers: ${activeSupervisors}`;
+
+      document.getElementById('stat-jurisdiction').textContent = session?.state || 'Delhi';
+      document.getElementById('stat-jurisdiction-sub').textContent = `Scans logged: ${stats.total_scans || 0}`;
+
+      const health = document.getElementById('system-health');
+      if (health) {
+        const metrics = [
+          { label: 'Scans processed in jurisdiction', value: stats.total_scans || 0 },
+          { label: 'Scans recorded today', value: stats.scans_today || 0 },
+          { label: 'Violations flagged by rule engine', value: stats.total_violations || 0 },
+          { label: 'Enforcement staff deployed', value: activeInspectors + activeSupervisors },
+        ];
+        health.innerHTML = metrics.map(m => `
+          <div class="system-metric">
+            <span>${m.label}</span>
+            <span style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;">
+              <span class="status-dot operational"></span>${m.value}
+            </span>
+          </div>`
+        ).join('');
+      }
+
+      const rd = document.getElementById('role-distribution');
+      if (rd) {
+        const roleCounts = users.reduce((counts, user) => {
+          counts[user.role] = (counts[user.role] || 0) + 1;
+          return counts;
+        }, {});
+        const staffTotal = Math.max(1, Object.values(roleCounts).reduce((sum, count) => sum + count, 0));
+        const roleLabels = { inspector: 'Enforcement Officers', supervisor: 'Nodal Supervisors' };
+        const roles = Object.entries(roleCounts).map(([role, count]) => ({
+          roleName: roleLabels[role] || role,
+          count,
+          pct: Math.round(count / staffTotal * 100)
+        }));
+        rd.innerHTML = roles.length ? roles.map(r => `
+          <div style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+              <span>${r.roleName}</span>
+              <span style="font-family:var(--font-mono);font-weight:600;">${r.count}</span>
+            </div>
+            <div style="height:8px;background:var(--parchment-dark);border-radius:4px;overflow:hidden;">
+              <div style="height:100%;width:${r.pct}%;background:var(--navy-600);border-radius:4px;"></div>
+            </div>
+          </div>`
+        ).join('') : '<p style="font-size:12px;color:var(--text-muted);padding:12px;">No subordinate staff registered yet.</p>';
+      }
+    } catch (_) {}
+  }
+
+  async function loadDashboard() {
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    document.getElementById('greeting-text').textContent = getGreeting() + ', Administrator';
+    document.getElementById('greeting-date').textContent = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ' · IST ' + getIST();
+
+    await loadDashboardStats();
+    loadUsers();
+  }
+
+  // ── Bootstrap ─────────────────────────────────────
+  initTheme();
+  renderGlobalBar();
+  const session = requireAuth('admin');
+  if (session) {
+    const name = session.name || session.userId;
+    document.getElementById('sidebar-user-name').textContent = name;
+    document.getElementById('sidebar-user-role').textContent = getRoleDisplay(session.role);
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    document.getElementById('sidebar-avatar').textContent = initials;
+    loadDashboard();
+  }
+</script>
+</body>
+</html>

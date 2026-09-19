@@ -1,0 +1,15 @@
+{
+  "name": "prism-packaged-rules-inspection-scanning-mechanism",
+  "private": true,
+  "version": "2.1.0",
+  "type": "module",
+  "description": "PRISM (Packaged Rules Inspection & Scanning Mechanism) — Vanilla HTML/CSS/JS frontend",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^8.0.5"
+  }
+}
