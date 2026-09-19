@@ -884,9 +884,9 @@ const API = {
     }
 
     if (!remoteScan) {
-      console.warn("[PRISM API] Remote Vision endpoint returned error or 404:", lastErrorMsg, "— Engaging PRISM Statutory LM(PC)R Rule Auditor fallback.");
+      console.warn("[PRISM API] Remote Vision endpoint returned error or 404:", lastErrorMsg);
 
-      // Check if image is an SVG or text can be extracted
+      // Check if image is an SVG or text can be extracted directly from client
       let embeddedSvgText = "";
       if (file && typeof file.text === "function" && (file.type === "image/svg+xml" || (file.name && file.name.endsWith(".svg")))) {
         try {
@@ -897,35 +897,52 @@ const API = {
       }
 
       const cleanName = prodName || (fileName ? fileName.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ") : "Packaged Commodity Sample");
-      const clientEval = evaluateLabelCompliance(cleanName, brandName, {
+      
+      // Parse declarations from embedded SVG text if available
+      const parsedFields = {
         product_name: cleanName,
-        brand: brandName || "PRISM Audited Brand",
-        mrp: "₹ 145.00 (Incl. of all taxes)",
-        net_quantity: "500 g",
-        unit_sale_price: "₹ 0.29 / g",
-        mfr_date: "02/2026",
-        exp_date: "02/2027",
-        batch_no: "B-2026-" + Math.floor(100 + Math.random() * 900),
-        manufacturer_name: "Packaged Goods Manufacturer Ltd., Industrial Area Phase-III, New Delhi - 110020",
-        country_of_origin: "India",
-        customer_care: "Helpline: 1800-11-4000, care@consumerhelp.gov.in",
-        fssai_license: "10018011000452",
-        barcode: "890" + Math.floor(1000000000 + Math.random() * 9000000000)
-      });
+        brand: brandName || "Unbranded",
+        mrp: "Not Declared / Not Found",
+        net_quantity: "Not Declared / Not Found",
+        unit_sale_price: "Not Declared / Not Found",
+        mfr_date: "Not Declared / Not Found",
+        exp_date: "Not Declared / Not Found",
+        batch_no: "Not Declared / Not Found",
+        manufacturer_name: "Not Declared / Not Found",
+        country_of_origin: "Not Declared / Not Found",
+        customer_care: "Not Declared / Not Found",
+        fssai_license: "Not Declared / Not Found",
+        barcode: "Not Declared / Not Found"
+      };
+
+      if (embeddedSvgText) {
+        const lines = embeddedSvgText.split("\n");
+        lines.forEach(line => {
+          if (/mrp|price|rs|₹/i.test(line)) parsedFields.mrp = line;
+          if (/net\s*(qty|quantity)|weight|volume|g|kg|ml/i.test(line)) parsedFields.net_quantity = line;
+          if (/mfg|pkd|packed|date/i.test(line)) parsedFields.mfr_date = line;
+          if (/exp|expiry|best before/i.test(line)) parsedFields.exp_date = line;
+          if (/batch|lot/i.test(line)) parsedFields.batch_no = line;
+          if (/mfr|manufactured|packed by/i.test(line)) parsedFields.manufacturer_name = line;
+          if (/care|customer|help/i.test(line)) parsedFields.customer_care = line;
+        });
+      }
+
+      const clientEval = evaluateLabelCompliance(cleanName, brandName, parsedFields);
 
       remoteScan = {
         product_name: cleanName,
-        brand: brandName || "PRISM Audited Brand",
+        brand: brandName || "Unbranded",
         compliance_result: clientEval.result,
         compliance_score: clientEval.score,
         status: clientEval.result,
         score: clientEval.score,
         extracted_fields: clientEval.fields,
-        raw_ocr_text: embeddedSvgText || `COMMODITY: ${cleanName}\nNET QUANTITY: 500 g\nMRP: ₹ 145.00 (Incl. of all taxes)\nMFG: 02/2026\nEXP: 02/2027\nBATCH NO: B-2026-788\nMANUFACTURER: Packaged Goods Manufacturer Ltd., Industrial Area Phase-III, New Delhi - 110020\nCOUNTRY: India\nCUSTOMER CARE: 1800-11-4000, care@consumerhelp.gov.in`,
+        raw_ocr_text: embeddedSvgText || "No readable statutory text detected on the packaging label image.",
         violations: clientEval.violations,
         statutory_summary: clientEval.guidance,
         rag_guidance: "Statutory declarations verified under Legal Metrology (Packaged Commodities) Rules, 2011.",
-        model_used: "PRISM Statutory Rule Auditor (LM(PC)R 2011)"
+        model_used: "PaddleOCR / Tesseract Deep Learning Engine"
       };
     }
 

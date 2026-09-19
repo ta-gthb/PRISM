@@ -6,6 +6,7 @@ spatial text bounding box detection, and Legal Metrology (Packaged Commodities) 
 import io
 import os
 import re
+import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
@@ -34,10 +35,13 @@ class OCRService:
             try:
                 from paddleocr import PaddleOCR
                 lang = os.getenv("PADDLE_LANG", "en")
-                self._paddle_ocr = PaddleOCR(use_angle_cls=True, lang=lang, show_log=False)
-                print(f"[OCRService] PaddleOCR initialized successfully with lang='{lang}'.")
+                try:
+                    self._paddle_ocr = PaddleOCR(use_angle_cls=True, lang=lang)
+                except TypeError:
+                    self._paddle_ocr = PaddleOCR(lang=lang)
+                sys.stderr.write(f"[OCRService] PaddleOCR initialized successfully with lang='{lang}'.\n")
             except Exception as exc:
-                print(f"[OCRService] PaddleOCR not available, falling back to OpenCV/Tesseract: {exc}")
+                sys.stderr.write(f"[OCRService] PaddleOCR not available, falling back to OpenCV/Tesseract: {exc}\n")
                 self._paddle_ocr = None
         return self._paddle_ocr
 
@@ -69,42 +73,57 @@ class OCRService:
         if not paddle:
             raise RuntimeError("PaddleOCR engine not initialized.")
 
-        result = paddle.ocr(cv_img, cls=True)
+        try:
+            result = paddle.ocr(cv_img, cls=True)
+        except TypeError:
+            result = paddle.ocr(cv_img)
+
         lines: List[str] = []
         words: List[Dict[str, Any]] = []
         confidences: List[float] = []
         heights: List[int] = []
 
-        if result and len(result) > 0 and result[0] is not None:
-            # Sort detections vertically (top to bottom) with tolerance for line-by-line reading
-            raw_detections = result[0]
-            
-            # Sort boxes top to bottom, then left to right
-            def box_sort_key(item):
-                box = item[0]
-                y_top = min(pt[1] for pt in box)
-                x_left = min(pt[0] for pt in box)
-                # Group lines within 15px vertically
-                line_bucket = int(y_top // 16)
-                return (line_bucket, x_left)
+        if result:
+            raw_detections = result[0] if isinstance(result, list) and len(result) > 0 and isinstance(result[0], list) else result
 
-            sorted_detections = sorted(raw_detections, key=box_sort_key)
+            for item in raw_detections:
+                if not item:
+                    continue
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    box, text_info = item[0], item[1]
+                    if isinstance(text_info, (list, tuple)) and len(text_info) >= 2:
+                        txt, conf = text_info[0], text_info[1]
+                    elif isinstance(text_info, str):
+                        txt, conf = text_info, 0.95
+                    else:
+                        txt, conf = str(text_info), 0.90
+                elif isinstance(item, dict):
+                    txt = item.get("rec_text", item.get("text", ""))
+                    conf = item.get("rec_score", item.get("confidence", 0.95))
+                    box = item.get("dt_polys", item.get("box", [[0, 0], [10, 0], [10, 10], [0, 10]]))
+                else:
+                    continue
 
-            for item in sorted_detections:
-                box, (txt, conf) = item
                 text_clean = str(txt).strip()
                 if not text_clean:
                     continue
 
                 lines.append(text_clean)
-                conf_pct = round(float(conf) * 100, 1)
+                try:
+                    conf_pct = round(float(conf) * 100, 1)
+                except Exception:
+                    conf_pct = 90.0
                 confidences.append(conf_pct)
 
-                x_coords = [pt[0] for pt in box]
-                y_coords = [pt[1] for pt in box]
-                x_min, x_max = int(min(x_coords)), int(max(x_coords))
-                y_min, y_max = int(min(y_coords)), int(max(y_coords))
-                box_h = max(1, y_max - y_min)
+                try:
+                    x_coords = [pt[0] for pt in box]
+                    y_coords = [pt[1] for pt in box]
+                    x_min, x_max = int(min(x_coords)), int(max(x_coords))
+                    y_min, y_max = int(min(y_coords)), int(max(y_coords))
+                    box_h = max(1, y_max - y_min)
+                except Exception:
+                    x_min, y_min, box_h = 0, 0, 14
+                    x_max = 50
                 heights.append(box_h)
 
                 words.append({
@@ -376,7 +395,7 @@ class OCRService:
             try:
                 raw_text, words, analysis = self._run_paddle_ocr(cv_img)
             except Exception as e:
-                print(f"[OCRService] PaddleOCR execution encountered an error, trying fallback: {e}")
+                sys.stderr.write(f"[OCRService] PaddleOCR execution encountered an error, trying fallback: {e}\n")
                 raw_text, words, analysis = self._run_tesseract_ocr(cv_img)
         else:
             raw_text, words, analysis = self._run_tesseract_ocr(cv_img)

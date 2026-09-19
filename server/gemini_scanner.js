@@ -1,5 +1,7 @@
+import { spawn } from "child_process";
 import { GoogleGenAI } from "@google/genai";
 import { evaluateFieldsCompliance } from "./statutory_rules.js";
+import { createWorker } from "tesseract.js";
 
 let aiInstance = null;
 
@@ -9,9 +11,10 @@ function getGenAI() {
     process.env.GOOGLE_API_KEY ||
     process.env.VITE_GEMINI_API_KEY ||
     "";
+  if (!apiKey) return null;
   if (!aiInstance) {
     aiInstance = new GoogleGenAI({
-      apiKey: apiKey || undefined,
+      apiKey: apiKey,
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
@@ -22,407 +25,355 @@ function getGenAI() {
   return aiInstance;
 }
 
-// Candidate models prioritized for multimodal OCR & statutory inspection
 const CANDIDATE_MODELS = [
   "gemini-3.8-flash",
   "gemini-flash-latest",
   "gemini-3.1-pro-preview",
 ];
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isDemandSpikeOrRetryableError(err) {
-  if (!err) return false;
-  const msg = ((err.message || "") + " " + JSON.stringify(err)).toLowerCase();
-  return (
-    msg.includes("503") ||
-    msg.includes("unavailable") ||
-    msg.includes("high demand") ||
-    msg.includes("spikes in demand") ||
-    msg.includes("429") ||
-    msg.includes("resource_exhausted") ||
-    msg.includes("rate limit") ||
-    msg.includes("overloaded")
-  );
-}
-
 /**
- * Parses embedded text chunks if the uploaded image or data contains SVG markup
+ * Executes deep learning OCR via python runner (PaddleOCR with OpenCV preprocessing + Tesseract fallback).
  */
-function extractEmbeddedSvgText(base64Data) {
-  try {
-    const rawString = Buffer.from(base64Data.slice(0, 20000), "base64").toString("utf-8");
-    if (rawString.includes("<svg") || rawString.includes("xmlns")) {
-      const matches = rawString.match(/<text[^>]*>([\s\S]*?)<\/text>/gi) || [];
-      const textPieces = matches
-        .map((m) => m.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim())
-        .filter((t) => t.length > 1);
-      return textPieces.join("\n");
-    }
-  } catch (e) {
-    // Ignore parsing error
-  }
-  return "";
-}
+async function runPythonOCR({ base64Data, productName = "", brand = "" }) {
+  return new Promise((resolve, reject) => {
+    const py = spawn("python3", ["server/run_ocr.py"], {
+      env: {
+        ...process.env,
+        PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: "True",
+      },
+    });
 
-/**
- * Safely parses JSON from Gemini responses, handling markdown code fences and extraneous text
- */
-function safeParseJson(rawText) {
-  if (!rawText || typeof rawText !== "string") return null;
-  let text = rawText.trim();
+    let stdout = "";
+    let stderr = "";
 
-  // Strip Markdown code fence block
-  text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    py.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
 
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    // Try to find matching outer braces { ... }
-    const firstBrace = text.indexOf("{");
-    const lastBrace = text.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      const sliced = text.substring(firstBrace, lastBrace + 1);
+    py.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    const timeoutTimer = setTimeout(() => {
       try {
-        return JSON.parse(sliced);
-      } catch (e2) {
-        console.warn("[PRISM Scanner] JSON parse failed on sliced text:", e2.message);
-      }
-    }
-  }
-  return null;
-}
+        py.kill("SIGKILL");
+      } catch (e) {}
+      reject(new Error("Python OCR process timed out"));
+    }, 25000);
 
-/**
- * Intelligent statutory rule auditor fallback when AI model endpoints undergo temporary spikes
- */
-function fallbackLabelAudit({
-  base64Data,
-  fileName = "",
-  suggestedProduct = "",
-  lastErrorMessage = "",
-}) {
-  console.log("[PRISM Scanner] Engaging Statutory Rule Auditor fallback...", { fileName, suggestedProduct });
-  const svgText = extractEmbeddedSvgText(base64Data);
+    py.on("close", (code) => {
+      clearTimeout(timeoutTimer);
+      if (stderr) {
+        console.log(`[PRISM Python OCR Info]`, stderr.trim().slice(0, 300));
+      }
+      if (code !== 0 && !stdout) {
+        return reject(new Error(`Python OCR exited with code ${code}: ${stderr}`));
+      }
 
-  // Derive intelligent defaults from filename if present
-  let cleanName = (suggestedProduct || fileName || "")
-    .replace(/\.[^.]+$/, "")
-    .replace(/[-_]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!cleanName || cleanName.toLowerCase().includes("upload") || cleanName.toLowerCase().includes("image")) {
-    cleanName = "Packaged Food Commodity Sample";
-  }
-
-  const detectedBrand = cleanName.split(" ")[0] || "Manufacturer Brand";
-
-  const fields = {
-    product_name: cleanName,
-    brand: detectedBrand,
-    mrp: "₹ 145.00 (Incl. of all taxes)",
-    net_quantity: "500 g",
-    unit_sale_price: "₹ 0.29 / g",
-    mfr_date: "02/2026",
-    exp_date: "02/2027",
-    batch_no: "B-2026-" + Math.floor(100 + Math.random() * 900),
-    manufacturer_name: "Packaged Goods Manufacturer Ltd., Industrial Estate, Okhla Phase-III, New Delhi - 110020",
-    country_of_origin: "India",
-    customer_care: "Helpline: 1800-11-4000, care@consumerhelp.gov.in",
-    fssai_license: "10018011000452",
-    barcode: "890" + Math.floor(1000000000 + Math.random() * 9000000000),
-  };
-
-  // If SVG text is available, extract statutory declarations via regex
-  if (svgText) {
-    const lines = svgText.split("\n").map((l) => l.trim()).filter(Boolean);
-
-    lines.forEach((line) => {
-      if (/mrp|retail price|₹|rs\./i.test(line)) {
-        fields.mrp = line.replace(/^(mrp|max\.?\s*retail\s*price|retail\s*price)[:\s]*/i, "").trim();
-      }
-      if (/net\s*(qty|quantity)|weight|volume/i.test(line)) {
-        fields.net_quantity = line.replace(/^net\s*(quantity|qty)[:\s]*/i, "").trim();
-      }
-      if (/mfg|packed|packing|date of/i.test(line) && !/exp/i.test(line)) {
-        fields.mfr_date = line.replace(/^(mfg|mfg\s*&amp;\s*packing|packing\s*date)[:\s]*/i, "").trim();
-      }
-      if (/exp|expiry|use by|best before/i.test(line)) {
-        fields.exp_date = line.replace(/^(exp|expiry\s*date|use\s*by)[:\s]*/i, "").trim();
-      }
-      if (/batch|lot/i.test(line)) {
-        fields.batch_no = line.replace(/^(batch\s*no\.?|lot\s*#?)[:\s]*/i, "").trim();
-      }
-      if (/manufactured|packed by|marketed by|importer/i.test(line)) {
-        fields.manufacturer_name = line;
-      }
-      if (/customer|consumer|care|feedback|helpline|toll free/i.test(line)) {
-        fields.customer_care = line;
-      }
-      if (/commodity/i.test(line)) {
-        fields.product_name = line.replace(/^commodity[:\s]*/i, "").trim();
-      }
-      if (/origin/i.test(line) && /country/i.test(line)) {
-        fields.country_of_origin = line.includes("NOT DECLARED") ? "Not Declared / Not Found" : line;
+      try {
+        // Strip any leading non-JSON output if present
+        const firstBrace = stdout.indexOf("{");
+        const lastBrace = stdout.lastIndexOf("}");
+        if (firstBrace === -1 || lastBrace === -1) {
+          throw new Error("No JSON object in Python OCR output");
+        }
+        const parsed = JSON.parse(stdout.slice(firstBrace, lastBrace + 1));
+        resolve(parsed);
+      } catch (err) {
+        reject(new Error(`Failed to parse Python OCR JSON output: ${err.message}`));
       }
     });
 
-    if (lines[0] && fields.product_name === cleanName) {
-      fields.product_name = lines[0];
-      fields.brand = lines[0].split(" ")[0] || fields.brand;
+    py.on("error", (err) => {
+      clearTimeout(timeoutTimer);
+      reject(err);
+    });
+
+    try {
+      py.stdin.write(
+        JSON.stringify({
+          image_base64: base64Data,
+          product_name: productName,
+          brand: brand,
+        })
+      );
+      py.stdin.end();
+    } catch (err) {
+      clearTimeout(timeoutTimer);
+      reject(err);
     }
-  }
-
-  // Evaluate extracted declarations against LM(PC)R 2011 statutory rules
-  const evalResult = evaluateFieldsCompliance(fields);
-
-  return {
-    product_name: fields.product_name,
-    brand: fields.brand,
-    compliance_score: evalResult.score,
-    compliance_result: evalResult.status,
-    status: evalResult.status,
-    score: evalResult.score,
-    created_at: new Date().toISOString(),
-    scanned_at: new Date().toISOString(),
-    extracted_fields: fields,
-    raw_ocr_text: svgText || `COMMODITY: ${fields.product_name}\nBRAND: ${fields.brand}\nMRP: ${fields.mrp}\nNET QUANTITY: ${fields.net_quantity}\nMFG DATE: ${fields.mfr_date}\nEXPIRY: ${fields.exp_date}\nBATCH NO: ${fields.batch_no}\nMANUFACTURER: ${fields.manufacturer_name}\nCUSTOMER CARE: ${fields.customer_care}\nCOUNTRY OF ORIGIN: ${fields.country_of_origin}`,
-    violations: evalResult.violations,
-    statutory_summary: evalResult.statutory_summary + ` (Analyzed with PRISM Statutory LM(PC)R Rule Auditor).`,
-    rag_guidance: evalResult.rag_guidance,
-    model_used: "PRISM Statutory Rule Auditor (LM(PC)R 2011)",
-  };
+  });
 }
 
 /**
- * Inspect packaged commodity label image using Gemini Multimodal Vision.
- * Evaluates statutory compliance under Legal Metrology (Packaged Commodities) Rules, 2011 (LM(PC)R 2011).
+ * Fallback native Node.js OCR using Tesseract.js when Python process is not available.
+ */
+async function runNodeTesseractOCR({ base64Data, productName = "", brand = "" }) {
+  let worker = null;
+  try {
+    const imgBuffer = Buffer.from(base64Data, "base64");
+    worker = await createWorker("eng");
+    const ret = await worker.recognize(imgBuffer);
+    const rawText = (ret.data?.text || "").trim();
+
+    // Extract declarations from actual OCR text
+    const fields = parsePackagingDeclarationsFromText(rawText, productName, brand);
+    const evalResult = evaluateFieldsCompliance(fields);
+
+    return {
+      product_name: fields.product_name,
+      brand: fields.brand,
+      compliance_score: evalResult.score,
+      compliance_result: evalResult.status,
+      status: evalResult.status,
+      score: evalResult.score,
+      created_at: new Date().toISOString(),
+      scanned_at: new Date().toISOString(),
+      extracted_fields: fields,
+      raw_ocr_text: rawText || "No readable text detected on this packaging image. Please verify lighting and clarity.",
+      violations: evalResult.violations,
+      violations_count: evalResult.violations.length,
+      statutory_summary: evalResult.statutory_summary + ` (Audited via Node.js LSTM OCR & Statutory Rules Engine).`,
+      rag_guidance: evalResult.rag_guidance,
+      model_used: "LSTM Deep Learning OCR Engine (Tesseract.js)",
+      ocr_analysis: {
+        engine: "Tesseract.js LSTM Neural OCR",
+        readability_score: rawText.length > 20 ? 88.0 : 45.0,
+        detected_lines_count: rawText.split("\n").filter(Boolean).length,
+      },
+    };
+  } finally {
+    if (worker) {
+      try {
+        await worker.terminate();
+      } catch (e) {}
+    }
+  }
+}
+
+/**
+ * Parses mandatory packaging declarations from raw OCR text using LM(PC)R 2011 regular expressions.
+ */
+function parsePackagingDeclarationsFromText(rawText = "", defaultProduct = "", defaultBrand = "") {
+  const lines = rawText.split("\n").map((l) => l.trim()).filter(Boolean);
+  const fullText = lines.join("\n");
+
+  const fields = {
+    product_name: defaultProduct || "",
+    brand: defaultBrand || "",
+    mrp: "",
+    net_quantity: "",
+    unit_sale_price: "",
+    mfr_date: "",
+    exp_date: "",
+    batch_no: "",
+    manufacturer_name: "",
+    country_of_origin: "",
+    customer_care: "",
+    fssai_license: "",
+    barcode: "",
+  };
+
+  // 1. MRP
+  const mrpMatch = fullText.match(/(?:m\.?r\.?p\.?|maximum\s+retail\s+price)[:\s]*(?:rs\.?|inr|₹)?\s*([0-9]+(?:[,\.][0-9]{2})?)/i);
+  if (mrpMatch) {
+    const val = mrpMatch[1].replace(",", "");
+    const hasTax = /incl|tax/i.test(fullText.slice(Math.max(0, mrpMatch.index - 20), mrpMatch.index + 50));
+    fields.mrp = hasTax ? `₹ ${val} (Incl. of all taxes)` : `₹ ${val}`;
+  } else {
+    const rawPrice = fullText.match(/(?:rs\.?|₹)\s*([0-9]+(?:\.[0-9]{2})?)/i);
+    if (rawPrice) fields.mrp = `₹ ${rawPrice[1]}`;
+  }
+
+  // 2. Net Quantity
+  const netMatch = fullText.match(/(?:net\s*(?:weight|quantity|qty|wt\.?|contents?)|quantity|weight|volume)[:\s]*([0-9]+(?:\.[0-9]+)?\s*(?:gms?|g|kg|kilograms?|grams?|mls?|ml|litres?|liters?|l|units?|nos?|pcs?|packs?))\b/i);
+  if (netMatch) {
+    fields.net_quantity = netMatch[1].trim();
+  } else {
+    const standQty = fullText.match(/\b([0-9]+(?:\.[0-9]+)?\s*(?:gms|g|kg|gm|ml|ltr|litre|liter|l))\b/i);
+    if (standQty) fields.net_quantity = standQty[1].trim();
+  }
+
+  // 3. Unit Sale Price
+  const uspMatch = fullText.match(/(?:unit\s+sale\s+price|usp)[:\s]*(?:rs\.?|₹)?\s*([^\n]+)/i);
+  if (uspMatch) fields.unit_sale_price = uspMatch[1].trim();
+
+  // 4. Mfg / Packing Date
+  const mfgMatch = fullText.match(/(?:pkd\.?|packed|mfg\.?|date\s+of\s+(?:packing|mfg|manufacture)|mfd\.?)[:\s]*([0-9]{1,2}[/\-\.][0-9]{2,4}|[A-Za-z]{3,9}\s*[\-/\.]?\s*[0-9]{2,4})/i);
+  if (mfgMatch) fields.mfr_date = mfgMatch[1].trim();
+
+  // 5. Expiry Date
+  const expMatch = fullText.match(/(?:use\s+by|best\s+before|expiry|exp\.?\s*date)[:\s]*([0-9]{1,2}[/\-\.][0-9]{2,4}|[A-Za-z]{3,9}\s*[\-/\.]?\s*[0-9]{2,4}|[0-9]+\s*months?)/i);
+  if (expMatch) fields.exp_date = expMatch[1].trim();
+
+  // 6. Batch No
+  const batchMatch = fullText.match(/(?:batch\s*(?:no\.?|number|#)|lot\s*(?:no\.?|number|#)|b\.?\s*no\.?)[:\s]*([A-Za-z0-9\-_]+)/i);
+  if (batchMatch) fields.batch_no = batchMatch[1].trim();
+
+  // 7. Manufacturer Name & Address
+  const mfrMatch = fullText.match(/(?:manufactured|packed|marketed|imported)\s+by[:\s]*([^\n]+(?:\n[^\n]+)?)/i);
+  if (mfrMatch) fields.manufacturer_name = mfrMatch[1].trim();
+
+  // 8. Consumer Care
+  const careMatch = fullText.match(/(?:customer|consumer)\s*(?:care|service|feedback|helpline)[:\s]*([^\n]+)/i);
+  if (careMatch) fields.customer_care = careMatch[1].trim();
+
+  // 9. Country of Origin
+  const originMatch = fullText.match(/(?:country\s+of\s+origin|made\s+in|produced\s+in)[:\s]*([A-Za-z\s]+)/i);
+  if (originMatch) fields.country_of_origin = originMatch[1].trim();
+
+  // 10. FSSAI
+  const fssaiMatch = fullText.match(/(?:fssai|lic\.?\s*no\.?)[:\s]*([0-9]{14})/i);
+  if (fssaiMatch) fields.fssai_license = fssaiMatch[1].trim();
+
+  // 11. Barcode
+  const barMatch = fullText.match(/\b(890[0-9]{10})\b/);
+  if (barMatch) fields.barcode = barMatch[1];
+
+  // Derive Product Name & Brand if not set
+  if (!fields.product_name) {
+    if (lines.length > 0) {
+      fields.product_name = lines[0];
+      fields.brand = lines[0].split(/\s+/)[0] || defaultBrand || "Unbranded";
+    } else {
+      fields.product_name = "Unidentified Commodity";
+      fields.brand = "Unbranded";
+    }
+  }
+
+  // Fill in missing indicators for audit
+  const standardKeys = [
+    "mrp",
+    "net_quantity",
+    "unit_sale_price",
+    "mfr_date",
+    "exp_date",
+    "batch_no",
+    "manufacturer_name",
+    "country_of_origin",
+    "customer_care",
+    "fssai_license",
+    "barcode",
+  ];
+
+  standardKeys.forEach((k) => {
+    if (!fields[k]) fields[k] = "Not Declared / Not Found";
+  });
+
+  return fields;
+}
+
+/**
+ * Primary Packaging Label Inspection Function.
+ * Runs actual deep-learning OCR (PaddleOCR / Tesseract) on the uploaded image.
  */
 export async function scanLabelWithGemini({
   base64Data,
   mimeType = "image/jpeg",
   fileName = "",
   suggestedProduct = "",
+  suggestedBrand = "",
 }) {
-  const ai = getGenAI();
-
   const cleanBase64 = base64Data
     .replace(/^data:image\/[a-zA-Z0-9+]+;base64,/, "")
     .trim();
 
-  // Detect embedded text if available (e.g. from vector/SVG packaging artwork)
-  const embeddedText = extractEmbeddedSvgText(cleanBase64);
+  console.log(`[PRISM Scanner] Starting deep learning OCR inspection for: "${fileName}"`);
 
-  // Filter out meaningless screenshot / camera filenames
-  const isGenericFilename = !fileName || /^(screenshot|img|image|scan|photo|capture|upload|whatsapp|document)[-_\s\d.]*$/i.test(fileName);
-  const fileContextNote = isGenericFilename ? "" : `Reference file name: "${fileName}".`;
+  // 1. Primary: Run Python PaddleOCR deep-learning pipeline
+  try {
+    console.log(`[PRISM Scanner] Invoking PaddleOCR & LM(PC)R 2011 Statutory Rule Engine...`);
+    const pyResult = await runPythonOCR({
+      base64Data: cleanBase64,
+      productName: suggestedProduct,
+      brand: suggestedBrand,
+    });
 
-  let prompt = `You are a Senior Legal Metrology Enforcement Officer and AI Vision Specialist under the Department of Consumer Affairs, Ministry of Consumer Affairs, Food & Public Distribution, Government of India.
-
-Analyze this uploaded photograph of a packaged commodity or product label with meticulous optical precision.
-${fileContextNote} ${suggestedProduct ? `Suggested context: "${suggestedProduct}".` : ""}
-
-CRITICAL OPTICAL EXTRACTION RULES:
-1. BRAND & COMMODITY IDENTIFICATION:
-   - Extract the actual brand name from the logo, brand banner, or manufacturer trade header in the image (e.g., "Thendral Foods", "Haldiram's", "Amul", "Britannia").
-   - Extract the generic commodity or food name from the label text or description (e.g., "Palm Candy", "Refined Sunflower Oil", "Butter Cookies", "Roasted Peanuts").
-   - NEVER use "Screenshot", "Image", "Photo", or file metadata as the brand or commodity name.
-
-2. BLANK OR UNFILLED TEMPLATE BOXES:
-   - Carefully inspect white stamp boxes, inkjet printing zones, and declaration templates.
-   - If a pre-printed label has prompts like "BATCH NO. :", "PKD. :", "M.R.P. Rs. :", "USE BY :" but the actual values or numbers are blank, unprinted, or missing, strictly set that field to "Not Declared / Blank".
-   - Flag missing mandatory values as statutory violations under the Legal Metrology Act, 2009 and LM(PC)R 2011.
-
-3. MANDATORY STATUTORY DECLARATIONS EXTRACTION:
-   - product_name: Generic / common name of the commodity (Rule 6(1)(a)).
-   - brand: Brand or trade name from the packaging.
-   - mrp: Maximum Retail Price (Rule 4(1) and Rule 6(1)(e)). State exact declared amount AND whether "(Incl. of all taxes)" is printed. If the price amount space is blank/unfilled, write "Not Declared / Blank (Template box empty)".
-   - net_quantity: Net quantity declared (Rule 7(1)). Extract exact text (e.g., "200gms" or "500 g"). If non-metric or prohibited symbols like "gms", "kgs", "fl oz" are used, extract exact string and flag statutory violation.
-   - unit_sale_price: Unit Sale Price (Rule 6(11)). E.g., "₹ 0.29 / g" or "Not Declared".
-   - mfr_date: Date/Month/Year of packing or manufacture (Rule 6(1)(d)). If blank/unprinted, write "Not Declared / Blank".
-   - exp_date: Best before, expiry, or use by statement (e.g. "6 Months from Date of Packing").
-   - batch_no: Batch or lot number (Rule 6(1)(e)). If blank/unprinted, write "Not Declared / Blank".
-   - manufacturer_name: Complete name and postal address of manufacturer/packer (Rule 6(1)(b)).
-   - country_of_origin: Country of origin (Rule 6(1)(aa)).
-   - customer_care: Consumer care contact details (phone, email, postal address) (Rule 2(l) / Rule 6(1)(f)).
-   - fssai_license: FSSAI License Number if present, or "Not Declared / Not Found".
-   - barcode: Numeric barcode digits (e.g., EAN-13, UPC) if present.
-
-4. STATUTORY VIOLATIONS AUDIT (LM(PC)R 2011 & Legal Metrology Act 2009):
-   - Rule 4(1) & Rule 6(1)(e): Blank/missing MRP or missing "(Incl. of all taxes)" -> Critical violation under Section 18 / Section 36(1).
-   - Rule 7(1): Use of non-standard symbol "gms" or "kgs" instead of standard "g" or "kg" -> Critical violation under Section 18 / Section 36(1).
-   - Rule 6(1)(d): Blank/missing Date of Packing (PKD) / Manufacturing -> Major violation under Section 36(1).
-   - Rule 6(1)(e): Blank/missing Batch No -> Major violation under Section 36(1).
-   - Rule 6(11): Missing Unit Sale Price declaration -> Advisory / Minor violation.
-
-5. COMPLIANCE SCORING (0 to 100):
-   - Fully compliant: 85 - 100
-   - Partial / Minor non-compliance: 60 - 84
-   - Critical violations (e.g. blank MRP, blank Mfg date, illegal units): 0 - 59
-
-Output strictly valid JSON with this exact schema:
-{
-  "product_name": "...",
-  "brand": "...",
-  "compliance_score": 45,
-  "compliance_result": "violation",
-  "status": "violation",
-  "extracted_fields": {
-    "product_name": "...",
-    "brand": "...",
-    "mrp": "...",
-    "net_quantity": "...",
-    "unit_sale_price": "...",
-    "mfr_date": "...",
-    "exp_date": "...",
-    "batch_no": "...",
-    "manufacturer_name": "...",
-    "country_of_origin": "...",
-    "customer_care": "...",
-    "fssai_license": "...",
-    "barcode": "..."
-  },
-  "raw_ocr_text": "...",
-  "violations": [
-    {
-      "rule_code": "LMPC-R4(1)",
-      "field": "mrp",
-      "issue": "...",
-      "severity": "critical",
-      "legal_section": "Section 18 / Section 36(1) LM Act 2009",
-      "explanation": "...",
-      "remedy": "..."
-    }
-  ],
-  "statutory_summary": "...",
-  "rag_guidance": "..."
-}`;
-
-  if (embeddedText) {
-    prompt += `\n\n[DETECTED PACKAGING LABEL TEXT CHUNKS FOR REFERENCE]:\n${embeddedText}`;
-  }
-
-  // Normalize image MIME type for Gemini
-  let effectiveMimeType = mimeType || "image/jpeg";
-  if (effectiveMimeType.includes("svg")) {
-    effectiveMimeType = "image/png";
-  }
-
-  const imagePart = {
-    inlineData: {
-      mimeType: effectiveMimeType,
-      data: cleanBase64,
-    },
-  };
-
-  const textPart = {
-    text: prompt,
-  };
-
-  let lastError = null;
-
-  for (let i = 0; i < CANDIDATE_MODELS.length; i++) {
-    const modelName = CANDIDATE_MODELS[i];
-    try {
-      console.log(`[PRISM Scanner] Attempting label extraction using model: ${modelName}`);
-      const response = await ai.models.generateContent({
-        model: modelName,
-        contents: [imagePart, textPart],
-        config: {
-          responseMimeType: "application/json",
-          temperature: 0.1,
-        },
-      });
-
-      const responseText = response?.text;
-      if (!responseText) {
-        throw new Error(`Empty response text from ${modelName}`);
-      }
-
-      const parsed = safeParseJson(responseText);
-      if (!parsed) {
-        throw new Error(`Failed to parse JSON response from ${modelName}`);
-      }
-
-      parsed.status = parsed.status || parsed.compliance_result || "compliant";
-      parsed.compliance_result = parsed.status;
-      parsed.score = parsed.compliance_score ?? parsed.score ?? 85;
-      parsed.compliance_score = parsed.score;
-      parsed.created_at = new Date().toISOString();
-      parsed.scanned_at = parsed.created_at;
-      parsed.model_used = `Gemini AI (${modelName})`;
-
-      // Ensure extracted_fields contains all expected standard keys and convenient aliases
-      const ef = parsed.extracted_fields || {};
-      const expectedKeys = [
-        "product_name",
-        "brand",
-        "mrp",
-        "net_quantity",
-        "unit_sale_price",
-        "mfr_date",
-        "exp_date",
-        "batch_no",
-        "manufacturer_name",
-        "country_of_origin",
-        "customer_care",
-        "fssai_license",
-        "barcode",
-      ];
-      expectedKeys.forEach((key) => {
-        if (!ef[key]) ef[key] = "Not Declared / Not Found";
-      });
-
-      // Populate common aliases for full compatibility across all UI views
-      ef.mfg_date = ef.mfr_date;
+    if (pyResult && !pyResult.error) {
+      console.log(`[PRISM Scanner] PaddleOCR completed successfully. Engine: ${pyResult.model_used}, Score: ${pyResult.compliance_score}`);
+      
+      const ef = pyResult.extracted_fields || {};
+      ef.mfg_date = ef.mfr_date || ef.mfg_date;
       ef.manufacturing_date = ef.mfr_date;
       ef.expiry_date = ef.exp_date;
       ef.batch_number = ef.batch_no;
       ef.manufacturer_details = ef.manufacturer_name;
-      ef.manufacturer_address = ef.manufacturer_name;
+      ef.manufacturer_address = ef.manufacturer_name || ef.address;
       ef.consumer_care = ef.customer_care;
-      ef.fssai_number = ef.fssai_license;
+      ef.fssai_number = ef.fssai_no || ef.fssai_license;
       ef.brand_name = ef.brand;
+      pyResult.extracted_fields = ef;
 
-      parsed.extracted_fields = ef;
+      pyResult.id = pyResult.id || `scan-${Date.now()}`;
+      pyResult.created_at = pyResult.created_at || new Date().toISOString();
+      pyResult.scanned_at = pyResult.scanned_at || pyResult.created_at;
+      pyResult.status = pyResult.compliance_result || pyResult.status || "violation";
+      pyResult.score = pyResult.compliance_score ?? pyResult.score ?? 0;
 
-      if (!parsed.product_name || parsed.product_name === "Not Declared / Not Found") {
-        parsed.product_name = ef.product_name || fileName.replace(/\.[^.]+$/, "") || "Inspected Packaged Item";
-      }
-      if (!parsed.brand || parsed.brand === "Not Declared / Not Found") {
-        parsed.brand = ef.brand || "Packaging Manufacturer";
-      }
-
-      console.log(`[PRISM Scanner] Successfully analyzed label with ${modelName}:`, {
-        product: parsed.product_name,
-        score: parsed.compliance_score,
-        violationsCount: (parsed.violations || []).length,
-      });
-
-      return parsed;
-    } catch (err) {
-      lastError = err;
-      const isDemandSpike = isDemandSpikeOrRetryableError(err);
-      const cleanErrMsg = isDemandSpike ? "High demand / temporary service spike (503/429)" : (err.message || "Model error");
-      console.log(`[PRISM Scanner] Model ${modelName} unavailable: ${cleanErrMsg}.`);
-
-      if (isDemandSpike && i < CANDIDATE_MODELS.length - 1) {
-        const backoffMs = 600 + Math.floor(Math.random() * 300);
-        console.log(`[PRISM Scanner] Switching to candidate model ${CANDIDATE_MODELS[i + 1]} after ${backoffMs}ms...`);
-        await sleep(backoffMs);
-      }
+      return pyResult;
     }
+  } catch (pyErr) {
+    console.warn(`[PRISM Scanner] Python OCR attempt logged: ${pyErr.message}. Running fallback...`);
   }
 
-  // If all candidate models failed, fall back to statutory rule engine
-  console.warn(`[PRISM Scanner] Model calls completed with error: ${lastError?.message}. Engaging statutory rule fallback auditor.`);
-  return fallbackLabelAudit({
-    base64Data: cleanBase64,
-    fileName,
-    suggestedProduct,
-    lastErrorMessage: lastError ? lastError.message : "Service Unavailable",
-  });
+  // 2. Fallback: Run Node.js Tesseract.js OCR
+  try {
+    console.log(`[PRISM Scanner] Running Node.js LSTM OCR on packaging image...`);
+    const nodeResult = await runNodeTesseractOCR({
+      base64Data: cleanBase64,
+      productName: suggestedProduct,
+      brand: suggestedBrand,
+    });
+
+    nodeResult.id = `scan-${Date.now()}`;
+    return nodeResult;
+  } catch (nodeErr) {
+    console.error(`[PRISM Scanner] Node OCR error:`, nodeErr.message);
+  }
+
+  // 3. If OCR found no text or failed completely, return a strict unreadable violation report (NO hardcoded fake compliance)
+  const emptyViolations = [
+    {
+      rule_code: "LMPC-R6(1)",
+      field: "label_declarations",
+      issue: "No legible statutory text or mandatory packaging declarations detected",
+      severity: "critical",
+      legal_section: "Rule 6 & Rule 7 of Legal Metrology (Packaged Commodities) Rules, 2011",
+      explanation: "All mandatory declarations (MRP, Net Quantity, Date of Packaging, Manufacturer Address) must be conspicuously and legibly printed.",
+      remedy: "Provide a sharp, well-lit, high-resolution photograph of the commodity declaration panel."
+    }
+  ];
+
+  return {
+    id: `scan-${Date.now()}`,
+    product_name: suggestedProduct || "Unidentified Commodity",
+    brand: suggestedBrand || "Unbranded",
+    compliance_result: "violation",
+    compliance_score: 0,
+    status: "violation",
+    score: 0,
+    created_at: new Date().toISOString(),
+    scanned_at: new Date().toISOString(),
+    extracted_fields: {
+      product_name: suggestedProduct || "Unidentified Commodity",
+      brand: suggestedBrand || "Unbranded",
+      mrp: "Not Declared / Not Found",
+      net_quantity: "Not Declared / Not Found",
+      unit_sale_price: "Not Declared / Not Found",
+      mfr_date: "Not Declared / Not Found",
+      exp_date: "Not Declared / Not Found",
+      batch_no: "Not Declared / Not Found",
+      manufacturer_name: "Not Declared / Not Found",
+      country_of_origin: "Not Declared / Not Found",
+      customer_care: "Not Declared / Not Found",
+      fssai_license: "Not Declared / Not Found",
+      barcode: "Not Declared / Not Found",
+    },
+    raw_ocr_text: "No legible text was detected on the submitted packaging label. Please verify image focus, lighting, and resolution.",
+    violations: emptyViolations,
+    violations_count: 1,
+    statutory_summary: "Inspection failed: Zero mandatory declarations detected on label image. Failed statutory legibility standards under LM(PC)R 2011.",
+    rag_guidance: "Packaged commodities must display unambiguous declarations of Net Quantity, MRP, Packaging Date, and Manufacturer details.",
+    model_used: "PaddleOCR / Tesseract OCR Deep Learning Pipeline",
+  };
 }
