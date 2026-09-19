@@ -1630,13 +1630,23 @@
   renderGlobalBar();
   const session = requireAuth('inspector');
   if (session) {
-    const name = session.name || session.userId;
-    document.getElementById('sidebar-user-name').textContent = name;
-    document.getElementById('sidebar-user-role').textContent = getRoleDisplay(session.role);
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    document.getElementById('sidebar-avatar').textContent = initials;
-    setGreeting(name.split(' ')[0]);
+    const updateUI = (s) => {
+      const name = s.name || s.userId || 'Inspector';
+      document.getElementById('sidebar-user-name').textContent = name;
+      document.getElementById('sidebar-user-role').textContent = getRoleDisplay(s.role);
+      const initials = name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      document.getElementById('sidebar-avatar').textContent = initials || 'IN';
+      setGreeting(name.split(' ')[0]);
+    };
+
+    updateUI(session);
     loadDashboard();
+
+    if (typeof syncCurrentUserSession === 'function') {
+      syncCurrentUserSession().then(updated => {
+        if (updated) updateUI(updated);
+      });
+    }
   }
 </script>
 </body>

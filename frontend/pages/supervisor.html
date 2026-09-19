@@ -601,13 +601,23 @@
   renderGlobalBar();
   const session = requireAuth('supervisor');
   if (session) {
-    const name = session.name || session.userId;
-    document.getElementById('sidebar-user-name').textContent = name;
-    document.getElementById('sidebar-user-role').textContent = getRoleDisplay(session.role);
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    document.getElementById('sidebar-avatar').textContent = initials;
+    const updateUI = (s) => {
+      const name = s.name || s.userId || 'Supervisor';
+      document.getElementById('sidebar-user-name').textContent = name;
+      document.getElementById('sidebar-user-role').textContent = getRoleDisplay(s.role);
+      const initials = name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      document.getElementById('sidebar-avatar').textContent = initials || 'SO';
+    };
+
+    updateUI(session);
     loadDashboard();
     loadActivity();
+
+    if (typeof syncCurrentUserSession === 'function') {
+      syncCurrentUserSession().then(updated => {
+        if (updated) updateUI(updated);
+      });
+    }
   }
 </script>
 </body>

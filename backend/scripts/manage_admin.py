@@ -420,6 +420,17 @@ def update_admin(args):
         auth_changes["email"] = args.email
     if password:
         auth_changes["password"] = password
+    user_metadata = {}
+    if args.name:
+        user_metadata["full_name"] = args.name
+    if args.state:
+        user_metadata["state"] = args.state
+    if args.organization:
+        user_metadata["organization"] = args.organization
+    if args.designation:
+        user_metadata["designation"] = args.designation
+    if user_metadata:
+        auth_changes["user_metadata"] = user_metadata
     if auth_changes:
         client.auth.admin.update_user_by_id(admin["supabase_user_id"], auth_changes)
     if changes:

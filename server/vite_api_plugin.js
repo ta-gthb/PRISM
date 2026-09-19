@@ -945,16 +945,22 @@ const ACTIVE_OTPS = new Map();
         const resolvedUserId = user.user_id;
         const token = "prism_jwt_" + Buffer.from(JSON.stringify({ user_id: resolvedUserId, role: targetRole, time: Date.now() })).toString("base64");
 
-        return sendJson(res, 200, {
-          token,
+        const userPayload = {
           user_id: resolvedUserId,
           name: user.name,
           email: user.email,
           role: targetRole,
           state: user.state,
-          organization: user.organization,
-          designation: user.designation,
+          organization: user.organization || "Department of Consumer Affairs",
+          designation: user.designation || (targetRole === 'admin' ? 'System Administrator' : targetRole === 'supervisor' ? 'Nodal Officer' : 'Field Inspector'),
           is_active: true
+        };
+
+        return sendJson(res, 200, {
+          token,
+          access_token: token,
+          user: userPayload,
+          ...userPayload
         });
       } catch (err) {
         return sendJson(res, 400, { error: err.message });

@@ -989,6 +989,16 @@ if (session) {
   loadOverview();
   checkOnboarding();
   initNavActive('manufacturer');
+
+  if (typeof syncCurrentUserSession === 'function') {
+    syncCurrentUserSession().then(function(updated) {
+      if (updated && updated.name) {
+        document.getElementById('sidebar-user-name').textContent = updated.name;
+        var inits = updated.name.split(' ').map(function(n) { return n[0]; }).join('').toUpperCase().slice(0, 2) || 'MF';
+        document.getElementById('sidebar-avatar').textContent = inits;
+      }
+    });
+  }
 }
 </script>
 

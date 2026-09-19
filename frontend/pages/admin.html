@@ -1114,8 +1114,15 @@
 
   async function loadDashboard() {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    document.getElementById('greeting-text').textContent = getGreeting() + ', Administrator';
+    const currentSession = getSession();
+    document.getElementById('greeting-text').textContent = `${getGreeting()}, ${currentSession?.name || 'Administrator'}`;
     document.getElementById('greeting-date').textContent = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ' · IST ' + getIST();
+
+    const jur = currentSession?.state || 'Assigned State';
+    const jurBadge = document.getElementById('users-jurisdiction-badge');
+    if (jurBadge) jurBadge.textContent = `Jurisdiction: ${jur}`;
+    const ruleBadge = document.getElementById('rules-state-badge');
+    if (ruleBadge) ruleBadge.textContent = `Jurisdiction: ${jur}`;
 
     await loadDashboardStats();
     loadUsers();
@@ -1126,12 +1133,31 @@
   renderGlobalBar();
   const session = requireAuth('admin');
   if (session) {
-    const name = session.name || session.userId;
-    document.getElementById('sidebar-user-name').textContent = name;
-    document.getElementById('sidebar-user-role').textContent = getRoleDisplay(session.role);
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    document.getElementById('sidebar-avatar').textContent = initials;
+    const updateUI = (s) => {
+      const name = s.name || s.userId || 'Administrator';
+      document.getElementById('sidebar-user-name').textContent = name;
+      document.getElementById('sidebar-user-role').textContent = getRoleDisplay(s.role);
+      const initials = name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      document.getElementById('sidebar-avatar').textContent = initials || 'SA';
+      const greetingEl = document.getElementById('greeting-text');
+      if (greetingEl) greetingEl.textContent = `${getGreeting()}, ${name}`;
+      const statJur = document.getElementById('stat-jurisdiction');
+      if (statJur) statJur.textContent = s.state || 'Delhi';
+      const jurBadge = document.getElementById('users-jurisdiction-badge');
+      if (jurBadge) jurBadge.textContent = `Jurisdiction: ${s.state || 'Assigned State'}`;
+      const ruleBadge = document.getElementById('rules-state-badge');
+      if (ruleBadge) ruleBadge.textContent = `Jurisdiction: ${s.state || 'Assigned State'}`;
+    };
+
+    updateUI(session);
     loadDashboard();
+
+    // Async sync with database to ensure live state & name reflection
+    if (typeof syncCurrentUserSession === 'function') {
+      syncCurrentUserSession().then(updated => {
+        if (updated) updateUI(updated);
+      });
+    }
   }
 </script>
 </body>
