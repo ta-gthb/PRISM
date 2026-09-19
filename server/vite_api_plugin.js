@@ -251,24 +251,35 @@ function addApiRoutes(middlewares) {
           const boundary = boundaryMatch ? boundaryMatch[1] || boundaryMatch[2] : null;
 
           if (boundary) {
-            const bufferStr = rawBuffer.toString("binary");
-            const parts = bufferStr.split(`--${boundary}`);
+            const boundaryBuf = Buffer.from(`--${boundary}`);
+            let startIdx = rawBuffer.indexOf(boundaryBuf);
+            while (startIdx !== -1) {
+              const nextStartIdx = rawBuffer.indexOf(boundaryBuf, startIdx + boundaryBuf.length);
+              if (nextStartIdx === -1) break;
 
-            for (const part of parts) {
-              if (part.includes('filename="') || part.includes("Content-Type: image/")) {
-                const fnMatch = part.match(/filename="([^"]+)"/i);
-                if (fnMatch) fileName = fnMatch[1];
+              const partBuf = rawBuffer.slice(startIdx + boundaryBuf.length, nextStartIdx);
+              const headerSep = Buffer.from("\r\n\r\n");
+              const headerEnd = partBuf.indexOf(headerSep);
 
-                const ctMatch = part.match(/Content-Type:\s*([^\r\n]+)/i);
-                if (ctMatch) mimeType = ctMatch[1].trim();
+              if (headerEnd !== -1) {
+                const headerStr = partBuf.slice(0, headerEnd).toString("utf-8");
+                if (headerStr.includes('filename="') || headerStr.includes("Content-Type: image/")) {
+                  const fnMatch = headerStr.match(/filename="([^"]+)"/i);
+                  if (fnMatch) fileName = fnMatch[1];
 
-                const headerEndIndex = part.indexOf("\r\n\r\n");
-                if (headerEndIndex !== -1) {
-                  const binaryData = part.slice(headerEndIndex + 4, part.lastIndexOf("\r\n"));
-                  base64Data = Buffer.from(binaryData, "binary").toString("base64");
+                  const ctMatch = headerStr.match(/Content-Type:\s*([^\r\n;]+)/i);
+                  if (ctMatch) mimeType = ctMatch[1].trim();
+
+                  let fileData = partBuf.slice(headerEnd + 4);
+                  // Remove trailing \r\n before next boundary
+                  if (fileData.length >= 2 && fileData[fileData.length - 2] === 13 && fileData[fileData.length - 1] === 10) {
+                    fileData = fileData.slice(0, fileData.length - 2);
+                  }
+                  base64Data = fileData.toString("base64");
                   break;
                 }
               }
+              startIdx = nextStartIdx;
             }
           }
         }

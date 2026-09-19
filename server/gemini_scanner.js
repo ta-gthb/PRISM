@@ -22,11 +22,11 @@ function getGenAI() {
   return aiInstance;
 }
 
-// Order prioritizing robust multimodal vision flash models
+// Order prioritizing robust modern multimodal vision flash models
 const CANDIDATE_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-2.5-pro",
+  "gemini-flash-latest",
+  "gemini-3.8-flash",
+  "gemini-3.1-pro-preview",
 ];
 
 function sleep(ms) {
@@ -296,12 +296,9 @@ Output strictly valid JSON with this exact schema:
       console.log(`[PRISM Scanner] Attempting label extraction using model: ${modelName}`);
       const response = await ai.models.generateContent({
         model: modelName,
-        contents: [
-          {
-            role: "user",
-            parts: [imagePart, textPart],
-          },
-        ],
+        contents: {
+          parts: [imagePart, textPart],
+        },
         config: {
           responseMimeType: "application/json",
           temperature: 0.1,
@@ -323,7 +320,7 @@ Output strictly valid JSON with this exact schema:
       parsed.scanned_at = parsed.created_at;
       parsed.model_used = modelName;
 
-      // Ensure extracted_fields contains all expected standard keys
+      // Ensure extracted_fields contains all expected standard keys and convenient aliases
       const ef = parsed.extracted_fields || {};
       const expectedKeys = [
         "product_name",
@@ -343,6 +340,18 @@ Output strictly valid JSON with this exact schema:
       expectedKeys.forEach((key) => {
         if (!ef[key]) ef[key] = "Not Declared / Not Found";
       });
+
+      // Populate common aliases for full compatibility across all UI views
+      ef.mfg_date = ef.mfr_date;
+      ef.manufacturing_date = ef.mfr_date;
+      ef.expiry_date = ef.exp_date;
+      ef.batch_number = ef.batch_no;
+      ef.manufacturer_details = ef.manufacturer_name;
+      ef.manufacturer_address = ef.manufacturer_name;
+      ef.consumer_care = ef.customer_care;
+      ef.fssai_number = ef.fssai_license;
+      ef.brand_name = ef.brand;
+
       parsed.extracted_fields = ef;
 
       if (!parsed.product_name || parsed.product_name === "Not Declared / Not Found") {
