@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import path from "node:path";
 import fs from "node:fs";
+import { prismApiPlugin } from "./server/vite_api_plugin.js";
 
 const frontendPath = (entry) => path.resolve(import.meta.dirname, "frontend", entry);
 
@@ -29,7 +30,7 @@ function copyStaticAssetsPlugin() {
 export default defineConfig(({ mode }) => ({
   root: frontendPath(""),
   base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : "/",
-  plugins: [copyStaticAssetsPlugin()],
+  plugins: [copyStaticAssetsPlugin(), prismApiPlugin()],
   build: {
     outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,

@@ -96,24 +96,9 @@ def _get_user(supabase_user_id: str) -> Optional[dict]:
 def _next_public_id(cur, role: UserRole) -> str:
     prefix = "MFR91" if role == UserRole.manufacturer else "CTZN91"
     year = str(__import__("datetime").datetime.now(__import__("datetime").timezone.utc).year)
-    cur.execute(
-        "SELECT user_id FROM users WHERE user_id LIKE %s OR user_id LIKE %s",
-        (f"{prefix}{year}%", f"{prefix}_{year}%"),
-    )
-    rows = cur.fetchall()
-    max_serial = 0
-    for r in rows:
-        uid = str(r["user_id"] if isinstance(r, dict) else r[0] if r else "")
-        tail = (
-            uid.replace(f"{prefix}_{year}_", "")
-            .replace(f"{prefix}_{year}", "")
-            .replace(f"{prefix}{year}", "")
-            .lstrip("_")
-        )
-        if tail.isdigit():
-            max_serial = max(max_serial, int(tail))
-    serial = max_serial + 1
-    return f"{prefix}{year}{serial:04d}"
+    cur.execute("SELECT COUNT(*) AS count FROM users WHERE user_id LIKE %s", (f"{prefix}{year}%",))
+    serial = int(cur.fetchone()["count"]) + 1
+    return f"{prefix}{year}{serial:06d}"
 
 
 def _provision_phone_user(payload: dict, requested_role: Optional[UserRole]) -> tuple[dict, bool]:

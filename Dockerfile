@@ -15,9 +15,8 @@ WORKDIR /app
 
 # Install Python requirements
 COPY backend/requirements.txt ./requirements.txt
-ENV PIP_ROOT_USER_ACTION=ignore
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --root-user-action=ignore --default-timeout=100 --retries 5 -r requirements.txt
+    pip install --no-cache-dir --default-timeout=100 --retries 5 -r requirements.txt
 
 # Copy backend code
 COPY backend/ .

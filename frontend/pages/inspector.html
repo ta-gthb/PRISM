@@ -128,9 +128,14 @@
 
   <!-- ── Main Content ───────────────────────────── -->
   <main class="main-content">
-    <div class="page-header">
-      <h1 class="page-title" id="page-title">Enforcement Officer Dashboard</h1>
-      <p class="page-subtitle" id="page-subtitle">Ministry of Consumer Affairs · Legal Metrology Division</p>
+    <div class="page-header" style="display:flex;align-items:center;gap:12px;">
+      <button id="back-btn-header" class="btn btn-outline btn-sm" onclick="showSection('dashboard', document.querySelector('[data-page=dashboard]'))" style="display:none;align-items:center;gap:6px;padding:6px 12px;font-size:13px;font-weight:500;">
+        ← Back
+      </button>
+      <div>
+        <h1 class="page-title" id="page-title" style="margin:0;">Enforcement Officer Dashboard</h1>
+        <p class="page-subtitle" id="page-subtitle" style="margin-top:2px;">Ministry of Consumer Affairs · Legal Metrology Division</p>
+      </div>
     </div>
 
     <div class="page-body">
@@ -223,56 +228,199 @@
 
       <!-- Scanner Section -->
       <div id="section-scanner" class="section">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="showSection('dashboard', document.querySelector('[data-page=dashboard]'))" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;font-size:13px;font-weight:500;">
+            ← Back
+          </button>
+          <h2 style="font-family:var(--font-display);font-size:18px;font-weight:700;margin:0;color:var(--text-base);">Label Scanner</h2>
+        </div>
+        <!-- Sample Test Presets for Enforcement Testing -->
+        <div class="card" style="margin-bottom:16px;background:var(--parchment);border-color:var(--border);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">
+              <span style="font-size:16px;">🏷️</span>
+              <span>Quick Test with Authentic Packaged Commodity Labels:</span>
+            </div>
+            <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);">Instant one-click test labels</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="loadSamplePreset('ghee_compliant')" style="background:var(--bg-card);">
+              <span style="color:var(--compliant);">●</span> Amul Cow Ghee 1L (100% Compliant)
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="loadSamplePreset('cookies_violation')" style="background:var(--bg-card);">
+              <span style="color:var(--violation);">●</span> Cookies 120g (Violates R4(1): Missing Tax)
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="loadSamplePreset('olive_oil_violation')" style="background:var(--bg-card);">
+              <span style="color:var(--violation);">●</span> Olive Oil (Violates R7(1): Non-Metric 'fl oz')
+            </button>
+          </div>
+        </div>
+
         <div class="card" style="margin-bottom:20px;">
           <div class="card-header">
-            <span class="card-title">Upload Product Label</span>
-            <span style="font-size:12px;color:var(--text-muted);font-family:var(--font-mono);">Supports JPG, PNG, PDF</span>
+            <span class="card-title">Upload Product Packaging Label</span>
+            <span style="font-size:12px;color:var(--text-muted);font-family:var(--font-mono);">Gemini Multimodal AI Vision · LM(PC)R 2011</span>
           </div>
           <div class="card-body">
             <div class="upload-zone" id="upload-zone" onclick="document.getElementById('label-file').click()">
               <div class="upload-zone-icon">📷</div>
-              <div class="upload-zone-title">Drop a product label here</div>
-              <div class="upload-zone-sub">or click to browse files</div>
+              <div class="upload-zone-title">Drop product label or packaging image here</div>
+              <div class="upload-zone-sub">or click to browse JPG, PNG, WEBP files from your device</div>
               <input type="file" id="label-file" accept="image/*" style="display:none" onchange="handleFileSelect(this)" />
             </div>
-            <img id="scan-preview" class="scan-preview" style="display:none;" alt="Label preview" />
-            <div id="file-info" style="display:none;margin-top:10px;font-size:12px;color:var(--text-muted);font-family:var(--font-mono);"></div>
-            <div style="margin-top:16px;display:flex;gap:10px;">
+
+            <!-- Inspection Lens / Preview Card -->
+            <div id="preview-wrapper" style="display:none;margin-top:16px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-base);display:flex;align-items:center;gap:6px;">
+                  <span>🔍 Packaging Inspection View</span>
+                  <span id="file-info" style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);font-weight:normal;"></span>
+                </span>
+                <div class="lens-controls" style="margin:0;padding:4px 8px;">
+                  <button type="button" class="lens-btn" onclick="zoomPreview(0.2)" title="Zoom in">+</button>
+                  <button type="button" class="lens-btn" onclick="zoomPreview(-0.2)" title="Zoom out">−</button>
+                  <button type="button" class="lens-btn" onclick="resetPreviewZoom()" title="Reset zoom">100%</button>
+                  <button type="button" class="lens-btn" id="contrast-toggle-btn" onclick="toggleContrast()" title="Enhance high-contrast for dot-matrix text">High Contrast</button>
+                </div>
+              </div>
+              <div style="overflow:auto;max-height:360px;background:#1a1a1a;border-radius:8px;border:1px solid var(--border);text-align:center;padding:12px;">
+                <img id="scan-preview" class="scan-preview" style="display:none;max-height:320px;transition:transform 0.2s ease, filter 0.2s ease;margin:0 auto;" alt="Label preview" />
+              </div>
+            </div>
+
+            <!-- Analysis Progress Indicator -->
+            <div id="scan-progress-box" style="display:none;margin-top:16px;padding:14px;background:var(--parchment);border-radius:var(--radius-md);border:1px solid var(--border);">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <div class="spinner" style="width:16px;height:16px;border-radius:50%;border:2px solid var(--amber-500);border-top-color:transparent;animation:spin .7s linear infinite;"></div>
+                <span id="scan-progress-status" style="font-size:13px;font-weight:600;color:var(--text-base);">Running Multimodal OCR &amp; Statutory Rule Extraction…</span>
+              </div>
+              <div class="progress-bar">
+                <div id="scan-progress-fill" class="progress-fill" style="width:35%;"></div>
+              </div>
+            </div>
+
+            <div style="margin-top:16px;display:flex;gap:10px;align-items:center;">
               <button class="btn btn-amber" id="scan-btn" onclick="runScan()" disabled>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 5V3h2M11 3h2v2M2 11v2h2M11 13h2v-2" stroke="white" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="8" r="2.5" stroke="white" stroke-width="1.4"/></svg>
-                Scan for Compliance
+                Scan with AI Vision
               </button>
-              <button class="btn btn-outline" onclick="clearScan()">Clear</button>
+              <button class="btn btn-outline" onclick="clearScan()">Clear Image</button>
+              <span id="active-scan-badge" style="display:none;font-size:11px;font-family:var(--font-mono);color:var(--text-muted);margin-left:auto;"></span>
             </div>
           </div>
         </div>
 
+        <!-- Scan Results Panel -->
         <div id="results-panel" style="display:none;">
-          <div class="two-col">
-            <div class="card">
-              <div class="card-header"><span class="card-title">Compliance Score</span></div>
-              <div class="card-body" style="text-align:center;">
-                <div id="score-ring-container"></div>
-                <div id="score-status" style="margin-top:12px;"></div>
-                <div id="scan-product-name" style="font-family:var(--font-display);font-size:15px;font-weight:600;margin-top:8px;"></div>
-                <div id="scan-brand" style="font-size:12px;color:var(--text-muted);"></div>
+          <!-- Product Summary Bar -->
+          <div class="card" style="margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span id="res-badge-status"></span>
+                  <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);padding:2px 6px;background:var(--parchment-dark);border-radius:4px;" id="res-model-badge">AI Vision Model</span>
+                </div>
+                <h3 id="scan-product-name" style="font-family:var(--font-display);font-size:18px;font-weight:700;margin:6px 0 2px;"></h3>
+                <div id="scan-brand" style="font-size:13px;color:var(--text-muted);"></div>
               </div>
-            </div>
-            <div class="card">
-              <div class="card-header"><span class="card-title">Violations Detected</span></div>
-              <div class="card-body" id="violations-list">
-                <p style="color:var(--text-muted);font-size:13px;">No results yet.</p>
+              <div style="display:flex;gap:8px;">
+                <button type="button" class="btn btn-outline btn-sm" onclick="openStatutoryNoticeModal()">
+                  📄 Draft Legal Notice
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="window.print()">
+                  🖨️ Export PDF
+                </button>
               </div>
             </div>
           </div>
-          <div class="card" style="margin-top:20px;">
-            <div class="card-header">
-              <span class="card-title">Extracted Label Fields</span>
-              <button class="btn btn-outline btn-sm" onclick="window.print()">Export PDF</button>
+
+          <!-- Score & Guidance Grid -->
+          <div class="two-col" style="margin-top:0;margin-bottom:20px;">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Compliance Assessment</span></div>
+              <div class="card-body" style="text-align:center;">
+                <div id="score-ring-container"></div>
+                <div id="score-status" style="margin-top:12px;"></div>
+                <div id="score-explanation" style="font-size:12px;color:var(--text-muted);margin-top:8px;"></div>
+              </div>
             </div>
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Legal Metrology Summary &amp; Action</span>
+              </div>
+              <div class="card-body">
+                <div id="statutory-summary-text" style="font-size:13px;line-height:1.6;color:var(--text-base);margin-bottom:12px;"></div>
+                <div id="recommended-action-box" class="notice notice-info" style="font-size:12px;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabs for Detailed Inspection -->
+          <div class="card">
             <div class="card-body">
-              <div class="extracted-grid" id="extracted-fields"></div>
+              <div class="inspector-tabs">
+                <button type="button" class="inspector-tab-btn active" id="tab-btn-fields" onclick="switchInspectorTab('fields')">
+                  📋 Mandatory Declarations (LM(PC)R 2011)
+                </button>
+                <button type="button" class="inspector-tab-btn" id="tab-btn-violations" onclick="switchInspectorTab('violations')">
+                  ⚖️ Statutory Violations (<span id="violations-count-badge">0</span>)
+                </button>
+                <button type="button" class="inspector-tab-btn" id="tab-btn-ocr" onclick="switchInspectorTab('ocr')">
+                  🔬 Verbatim OCR Transcription
+                </button>
+              </div>
+
+              <!-- TAB 1: Statutory Fields -->
+              <div id="tab-content-fields">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                  <span style="font-size:12px;color:var(--text-muted);">
+                    Auditing statutory declarations required under Rule 4, 6, and 7 of LM(PC)R 2011. You can verify or correct any field below.
+                  </span>
+                  <button type="button" class="btn btn-outline btn-sm" onclick="recalculateFields()" id="recalc-btn" style="display:none;">
+                    🔄 Recalculate Compliance
+                  </button>
+                </div>
+                <div id="statutory-fields-container"></div>
+              </div>
+
+              <!-- TAB 2: Violations & Statutory Notice -->
+              <div id="tab-content-violations" style="display:none;">
+                <div id="violations-list-container">
+                  <p style="color:var(--text-muted);font-size:13px;">No violations detected.</p>
+                </div>
+              </div>
+
+              <!-- TAB 3: Verbatim OCR -->
+              <div id="tab-content-ocr" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                  <span style="font-size:12px;color:var(--text-muted);">Verbatim text transcribed directly from the packaging label by the AI vision scanner:</span>
+                  <button type="button" class="btn btn-outline btn-sm" onclick="copyOcrText()">📋 Copy OCR Text</button>
+                </div>
+                <pre id="raw-ocr-display" style="background:var(--parchment);padding:14px;border-radius:8px;font-family:var(--font-mono);font-size:12px;white-space:pre-wrap;line-height:1.6;border:1px solid var(--border);max-height:360px;overflow:auto;"></pre>
+              </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Statutory Inspection Notice Modal -->
+      <div id="statutory-notice-modal" class="modal-backdrop" style="display:none;">
+        <div class="modal" style="max-width:680px;">
+          <div class="modal-header">
+            <span class="modal-title" style="font-family:var(--font-display);font-size:16px;font-weight:700;">
+              Government of India · Legal Metrology Enforcement Notice
+            </span>
+            <button type="button" class="modal-close" onclick="closeStatutoryNoticeModal()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div id="notice-document-content" style="background:#fff;color:#111;padding:24px;border:1px solid #ddd;border-radius:6px;font-family:Georgia, serif;font-size:13px;line-height:1.7;">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="copyNoticeText()">Copy Notice Text</button>
+            <button type="button" class="btn btn-amber" onclick="printNoticeDocument()">🖨️ Print Formal Notice</button>
+            <button type="button" class="btn btn-outline" onclick="closeStatutoryNoticeModal()">Close</button>
           </div>
         </div>
       </div>
@@ -360,6 +508,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/auth.js"></script>
 <script src="../js/api.js"></script>
+<script src="../js/sample_labels.js"></script>
 <script src="../js/utils.js"></script>
 <script>
   function getRoleDisplay(role) {
@@ -372,9 +521,16 @@
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     const section = document.getElementById('section-' + id);
     if (section) section.classList.add('active');
+    if (!navEl && id) navEl = document.querySelector(`[data-page="${id}"]`);
     if (navEl) navEl.classList.add('active');
     const titles = { dashboard: 'Enforcement Officer Dashboard', scanner: 'Label Scanner', repository: 'Product Repository', reports: 'Reports', profile: 'My Profile' };
     document.getElementById('page-title').textContent = titles[id] || 'Dashboard';
+    
+    const backBtn = document.getElementById('back-btn-header');
+    if (backBtn) {
+      backBtn.style.display = (id === 'dashboard') ? 'none' : 'inline-flex';
+    }
+
     if (id === 'profile') loadProfile();
   }
 
@@ -430,24 +586,28 @@
     try {
       const data = await API.getScanHistory();
       const items = data.items || [];
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No recent scans found.</td></tr>';
+        return;
+      }
       tbody.innerHTML = items.map(scan => `
         <tr>
-          <td style="font-weight:500;">${scan.product_name}</td>
-          <td style="color:var(--text-muted);">${scan.brand}</td>
-          <td>${complianceBadge(scan.status)}</td>
+          <td style="font-weight:500;">${scan.product_name || 'Unspecified Commodity'}</td>
+          <td style="color:var(--text-muted);">${scan.brand || '—'}</td>
+          <td>${complianceBadge(scan.status || scan.compliance_result)}</td>
           <td>
             <div style="display:flex;align-items:center;gap:6px;">
               <div style="flex:1;height:6px;background:var(--parchment-dark);border-radius:3px;max-width:60px;">
-                <div style="height:100%;width:${scan.score}%;background:${scan.score>=80?'var(--compliant)':scan.score>=50?'var(--amber-600)':'var(--violation)'};border-radius:3px;"></div>
+                <div style="height:100%;width:${scan.score ?? scan.compliance_score ?? 0}%;background:${(scan.score ?? scan.compliance_score ?? 0)>=80?'var(--compliant)':(scan.score ?? scan.compliance_score ?? 0)>=50?'var(--amber-600)':'var(--violation)'};border-radius:3px;"></div>
               </div>
-              <span style="font-family:var(--font-mono);font-size:12px;">${scan.score}</span>
+              <span style="font-family:var(--font-mono);font-size:12px;">${scan.score ?? scan.compliance_score ?? 0}</span>
             </div>
           </td>
-          <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">${fmtDateTime(scan.scanned_at)}</td>
+          <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">${fmtDateTime(scan.scanned_at || scan.created_at)}</td>
           <td>
             <div style="display:flex;gap:4px;">
-              <button class="btn btn-ghost btn-sm" title="View details">View</button>
-              <button class="btn btn-outline btn-sm" title="Download report">↓</button>
+              <button type="button" class="btn btn-ghost btn-sm" title="View details" onclick="viewScanDetails('${scan.id}')">View</button>
+              <button type="button" class="btn btn-outline btn-sm" title="Download report" onclick="downloadScanReportById('${scan.id}')">↓</button>
             </div>
           </td>
         </tr>`
@@ -478,23 +638,165 @@
     try {
       const data = await API.getProducts();
       const items = data.items || [];
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">No products in repository.</td></tr>';
+        return;
+      }
       tbody.innerHTML = items.map(p => `
         <tr>
           <td style="font-weight:500;">${p.name}</td>
-          <td>${p.brand}</td>
-          <td style="font-family:var(--font-mono);font-size:12px;">${p.barcode}</td>
-          <td>${complianceBadge(p.compliance_status)}</td>
-          <td style="font-family:var(--font-mono);font-size:12px;">${p.scan_count}</td>
-          <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">${p.last_scanned_at}</td>
+          <td>${p.brand || '—'}</td>
+          <td style="font-family:var(--font-mono);font-size:12px;">${p.barcode || '—'}</td>
+          <td>${complianceBadge(p.compliance_status || 'compliant')}</td>
+          <td style="font-family:var(--font-mono);font-size:12px;">${p.scan_count || 1}</td>
+          <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">${p.last_scanned_at || 'Recently'}</td>
           <td>
             <div style="display:flex;gap:4px;">
-              <button class="btn btn-ghost btn-sm">View</button>
-              <button class="btn btn-outline btn-sm" onclick="showSection('scanner',document.querySelector('[data-page=scanner]'))">Re-scan</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="viewProductScans('${p.name.replace(/'/g, "\\'")}')">View</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="showSection('scanner',document.querySelector('[data-page=scanner]'))">Re-scan</button>
             </div>
           </td>
         </tr>`
       ).join('');
     } catch(e) { console.error(e); }
+  }
+
+  async function viewScanDetails(scanId) {
+    try {
+      showToast('Loading scanned product details...', 'info');
+      const result = await API.getScan(scanId);
+      if (!result) {
+        showToast('Scan details not found.', 'error');
+        return;
+      }
+
+      currentScanResult = result;
+      editedFields = { ...(result.extracted_fields || {}) };
+      if (!editedFields.brand_name) {
+        editedFields.brand_name = result.brand || result.extracted_fields?.brand_name || '—';
+      }
+
+      renderScanResult(result);
+
+      if (result.image_url) {
+        const previewImg = document.getElementById('scan-preview');
+        previewImg.src = result.image_url;
+        previewImg.style.display = 'block';
+        document.getElementById('preview-wrapper').style.display = 'block';
+      }
+
+      showSection('scanner', document.querySelector('[data-page="scanner"]'));
+      document.getElementById('results-panel').style.display = 'block';
+
+      setTimeout(() => {
+        document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+
+      showToast(`Viewing scan details for: ${result.product_name || 'Product'}`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error loading scan details: ' + err.message, 'error');
+    }
+  }
+
+  async function viewProductScans(productName) {
+    try {
+      const data = await API.getScanHistory();
+      const items = data.items || [];
+      const match = items.find(s => (s.product_name || '').toLowerCase().includes(productName.toLowerCase()));
+      if (match) {
+        await viewScanDetails(match.id);
+      } else {
+        showToast('No scan records found for ' + productName, 'info');
+      }
+    } catch(e) { console.error(e); }
+  }
+
+  async function downloadScanReportById(scanId) {
+    try {
+      showToast('Generating statutory inspection report...', 'info');
+      const scan = scanId ? await API.getScan(scanId) : currentScanResult;
+      if (!scan) {
+        showToast('No scan data available.', 'error');
+        return;
+      }
+
+      let report;
+      try {
+        report = await API.generateReport({
+          title: `Legal Metrology Inspection Report — ${scan.product_name || 'Commodity'}`,
+          report_type: 'detailed',
+          format: 'pdf',
+          filters: { scan_id: scan.id }
+        });
+      } catch (e) {
+        console.warn('Backend report generation fallback:', e);
+      }
+
+      if (report && report.file_url && !report.file_url.startsWith('data:')) {
+        const downloadUrl = API.downloadReport(report.id, 'pdf') || report.file_url;
+        window.open(downloadUrl, '_blank');
+        showToast('Inspection report generated.', 'success');
+      } else {
+        const fields = scan.extracted_fields || {};
+        const textContent = `
+===================================================================
+MINISTRY OF CONSUMER AFFAIRS · LEGAL METROLOGY DIVISION
+STATUTORY LABEL COMPLIANCE INSPECTION REPORT
+===================================================================
+Report ID         : REP-${Date.now()}
+Scan ID           : ${scan.id}
+Date & Time       : ${scan.scanned_at || scan.created_at || new Date().toLocaleString()}
+Product Name      : ${scan.product_name || 'N/A'}
+Brand Name        : ${scan.brand || 'N/A'}
+Compliance Status : ${(scan.status || scan.compliance_result || 'N/A').toUpperCase()}
+Compliance Score  : ${scan.score ?? scan.compliance_score ?? 0}%
+Inspection Engine : ${scan.model_used || 'AI Vision Engine'}
+
+-------------------------------------------------------------------
+MANDATORY STATUTORY DECLARATIONS AUDITED
+-------------------------------------------------------------------
+FSSAI / Standard Mark               : ${fields.fssai_license || '—'}
+Maximum Retail Price (MRP)          : ${fields.mrp || '—'}
+Net Quantity (SI Units)             : ${fields.net_quantity || '—'}
+Unit Sale Price (USP)              : ${fields.unit_sale_price || '—'}
+Date of Manufacture / Packing       : ${fields.mfg_date || fields.mfr_date || '—'}
+Expiry / Best Before Date           : ${fields.expiry_date || fields.exp_date || '—'}
+Batch / Lot / Code Number           : ${fields.batch_number || fields.batch_no || '—'}
+Manufacturer / Packer Address       : ${fields.manufacturer_details || fields.manufacturer_name || '—'}
+Country of Origin                   : ${fields.country_of_origin || '—'}
+
+-------------------------------------------------------------------
+STATUTORY NON-COMPLIANCES / VIOLATIONS (${(scan.violations || []).length})
+-------------------------------------------------------------------
+${(scan.violations || []).map((v, i) => `${i+1}. [${(v.severity || 'MAJOR').toUpperCase()}] ${v.rule_code || 'Rule'} - ${v.field}: ${v.description || v.message || 'Non-compliance detected'}`).join('\n') || 'None. Packaging label satisfies statutory provisions under LM(PC)R 2011.'}
+
+-------------------------------------------------------------------
+STATUTORY AUDIT FINDINGS & LEGAL ACTION
+-------------------------------------------------------------------
+${scan.statutory_summary || scan.rag_guidance || 'Inspected under Rule 4, 6, and 7 of Legal Metrology (Packaged Commodities) Rules, 2011.'}
+
+===================================================================
+Officer Signature: Enforcement Inspector (Delhi Zone)
+Official Seal: Legal Metrology Department
+===================================================================
+`.trim();
+
+        const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `LM_Inspection_Report_${(scan.product_name || 'commodity').replace(/[^a-zA-Z0-9]/g, '_')}_${scan.id}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Inspection report downloaded successfully.', 'success');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Could not download report: ' + err.message, 'error');
+    }
   }
 
   async function loadReports() {
@@ -515,83 +817,529 @@
     } catch(e) { list.innerHTML = '<p style="color:var(--text-muted);">Could not load reports.</p>'; }
   }
 
-  function handleFileSelect(input) {
-    const file = input.files[0];
-    if (!file) return;
-    document.getElementById('scan-btn').disabled = false;
-    document.getElementById('file-info').style.display = 'block';
-    document.getElementById('file-info').textContent = file.name + ' — ' + fmtFileSize(file.size);
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const img = document.getElementById('scan-preview');
-        img.src = e.target.result;
-        img.style.display = 'block';
-      };
-      reader.readAsDataURL(file);
+  // ── Inspection Lens State ───────────────────────────
+  let currentZoom = 1.0;
+  let isHighContrast = false;
+  let currentScanResult = null;
+  let editedFields = {};
+
+  function zoomPreview(delta) {
+    currentZoom = Math.min(3.0, Math.max(0.4, currentZoom + delta));
+    const img = document.getElementById('scan-preview');
+    img.style.transform = `scale(${currentZoom})`;
+  }
+
+  function resetPreviewZoom() {
+    currentZoom = 1.0;
+    const img = document.getElementById('scan-preview');
+    img.style.transform = 'scale(1)';
+  }
+
+  function toggleContrast() {
+    isHighContrast = !isHighContrast;
+    const img = document.getElementById('scan-preview');
+    const btn = document.getElementById('contrast-toggle-btn');
+    if (isHighContrast) {
+      img.style.filter = 'contrast(220%) grayscale(100%) brightness(95%)';
+      btn.classList.add('active');
+    } else {
+      img.style.filter = 'none';
+      btn.classList.remove('active');
     }
+  }
+
+  // ── Sample Presets Loader ───────────────────────────
+  async function loadSamplePreset(presetKey) {
+    if (!window.SAMPLE_LABELS || !window.SAMPLE_LABELS[presetKey]) {
+      return showToast('Sample label not found.', 'error');
+    }
+    const sample = window.SAMPLE_LABELS[presetKey];
+
+    // Convert and rasterize vector artwork into high-definition PNG for optical vision analysis
+    let blob = null;
+    if (typeof window.SAMPLE_LABELS.getPngBlob === 'function') {
+      blob = await window.SAMPLE_LABELS.getPngBlob(presetKey);
+    }
+    if (!blob) {
+      const res = await fetch(sample.getDataUrl());
+      blob = await res.blob();
+    }
+    const isPng = blob.type && blob.type.includes('png');
+    const file = new File([blob], `${sample.id}.${isPng ? 'png' : 'svg'}`, { type: blob.type || 'image/png' });
+
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const input = document.getElementById('label-file');
+    input.files = dt.files;
+
+    handleFileSelect(input);
+    showToast(`Loaded sample: ${sample.title}. Scanning…`, 'info');
+    runScan();
+  }
+
+  async function handleFileSelect(input) {
+    let file = input.files[0];
+    if (!file) return;
+
+    // If an SVG vector was selected, convert to high-res PNG for optimal AI model OCR
+    if ((file.type === 'image/svg+xml' || file.name.endsWith('.svg')) && window.SAMPLE_LABELS && window.SAMPLE_LABELS.rasterizeSvgToPngBlob) {
+      try {
+        const svgText = await file.text();
+        const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText);
+        const pngBlob = await window.SAMPLE_LABELS.rasterizeSvgToPngBlob(dataUrl);
+        if (pngBlob) {
+          file = new File([pngBlob], file.name.replace(/\.svg$/i, '.png'), { type: 'image/png' });
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          input.files = dt.files;
+        }
+      } catch (e) {
+        console.warn('SVG rasterize skipped:', e);
+      }
+    }
+
+    document.getElementById('scan-btn').disabled = false;
+    document.getElementById('file-info').textContent = file.name + ' (' + fmtFileSize(file.size) + ')';
+    document.getElementById('preview-wrapper').style.display = 'block';
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.getElementById('scan-preview');
+      img.src = e.target.result;
+      img.style.display = 'block';
+      resetPreviewZoom();
+    };
+    reader.readAsDataURL(file);
   }
 
   async function runScan() {
     const btn = document.getElementById('scan-btn');
     const file = document.getElementById('label-file').files[0];
-    if (!file) return showToast('Please select a file first.', 'error');
+    if (!file) return showToast('Please select an image first.', 'error');
+
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .7s linear infinite;display:inline-block;"></span> Analysing…';
+    const progressBox = document.getElementById('scan-progress-box');
+    const progressFill = document.getElementById('scan-progress-fill');
+    const progressStatus = document.getElementById('scan-progress-status');
+    progressBox.style.display = 'block';
+    progressFill.style.width = '25%';
+    progressStatus.textContent = 'Preprocessing packaging image & loading AI vision model…';
+
+    const stepTimer = setTimeout(() => {
+      progressFill.style.width = '65%';
+      progressStatus.textContent = 'Extracting mandatory statutory declarations per LM(PC)R 2011…';
+    }, 900);
+
     try {
       const fd = new FormData();
       fd.append('file', file);
       const result = await API.scanImage(fd);
+
+      clearTimeout(stepTimer);
+      progressFill.style.width = '100%';
+      progressStatus.textContent = 'Statutory compliance verification complete!';
+
+      currentScanResult = result;
+      editedFields = { ...(result.extracted_fields || {}) };
+
       renderScanResult(result);
       document.getElementById('results-panel').style.display = 'block';
-      showToast('Scan complete!', 'success');
-    } catch(e) {
+      setTimeout(() => {
+        document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+
+      showToast(`Scan complete: ${result.compliance_score}% Compliance Score`, 'success');
+      await Promise.all([loadStats(), loadRecentScans(), loadViolations(), loadProducts()]);
+    } catch (e) {
+      clearTimeout(stepTimer);
       showToast('Scan failed: ' + e.message, 'error');
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 5V3h2M11 3h2v2M2 11v2h2M11 13h2v-2" stroke="white" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="8" r="2.5" stroke="white" stroke-width="1.4"/></svg> Scan for Compliance';
+      setTimeout(() => {
+        progressBox.style.display = 'none';
+      }, 1200);
     }
-  }
-
-  function renderScanResult(result) {
-    document.getElementById('score-ring-container').innerHTML = scoreRingHTML(result.compliance_score);
-    document.getElementById('score-status').innerHTML = complianceBadge(result.status);
-    document.getElementById('scan-product-name').textContent = result.product_name || 'Unknown Product';
-    document.getElementById('scan-brand').textContent = result.brand || '';
-
-    const vlist = document.getElementById('violations-list');
-    if (!result.violations || result.violations.length === 0) {
-      vlist.innerHTML = '<p style="color:var(--compliant);font-size:13px;font-weight:600;">✓ No violations found. Label is fully compliant.</p>';
-    } else {
-      vlist.innerHTML = result.violations.map(v => `
-        <div class="violation-item">
-          <span class="violation-dot ${v.severity}"></span>
-          <div class="violation-meta">
-            <div class="violation-field">${v.field.replace(/_/g,' ')}</div>
-            <div class="violation-rule">${v.rule_code}</div>
-            <div class="violation-issue">${v.issue}</div>
-          </div>
-          <span class="badge badge-${v.severity === 'critical' ? 'violation' : v.severity === 'major' ? 'warning' : 'compliant'}" style="text-transform:capitalize;">${v.severity}</span>
-        </div>`
-      ).join('');
-    }
-
-    const ef = document.getElementById('extracted-fields');
-    const fields = result.extracted_fields || {};
-    ef.innerHTML = Object.entries(fields).map(([k, v]) => `
-      <div class="extracted-field">
-        <div class="extracted-field-label">${k.replace(/_/g,' ')}</div>
-        <div class="extracted-field-value">${v}</div>
-      </div>`
-    ).join('');
   }
 
   function clearScan() {
     document.getElementById('label-file').value = '';
     document.getElementById('scan-preview').style.display = 'none';
-    document.getElementById('file-info').style.display = 'none';
+    document.getElementById('preview-wrapper').style.display = 'none';
     document.getElementById('scan-btn').disabled = true;
     document.getElementById('results-panel').style.display = 'none';
+    currentScanResult = null;
+    editedFields = {};
+  }
+
+  // ── Render Results with Statutory Precision ─────────
+  const STATUTORY_FIELD_GROUPS = [
+    {
+      group: "Commodity & Brand Identity",
+      fields: [
+        { key: "brand_name", label: "Brand Name", rule: "Brand Identity" },
+        { key: "fssai_license", label: "FSSAI / Standard Mark", rule: "Food / FSSA" },
+      ]
+    },
+    {
+      group: "Pricing & Metric Declarations",
+      fields: [
+        { key: "mrp", label: "Maximum Retail Price (MRP)", rule: "Rule 4(1)" },
+        { key: "net_quantity", label: "Net Quantity (Standard SI Units)", rule: "Rule 7(1)" },
+        { key: "unit_sale_price", label: "Unit Sale Price (USP)", rule: "Rule 6(11)" },
+      ]
+    },
+    {
+      group: "Packaging Dates & Traceability",
+      fields: [
+        { key: "mfg_date", label: "Date of Manufacture / Packing", rule: "Rule 6(1)(d)" },
+        { key: "expiry_date", label: "Expiry / Best Before", rule: "Rule 6(1)(d)" },
+        { key: "batch_number", label: "Batch / Lot / Code No.", rule: "Rule 6(1)(e)" },
+      ]
+    },
+    {
+      group: "Manufacturer & Consumer Grievance",
+      fields: [
+        { key: "manufacturer_details", label: "Manufacturer / Packer Postal Address", rule: "Rule 6(1)(b)" },
+        { key: "country_of_origin", label: "Country of Origin", rule: "Rule 6(1)(aa)" },
+        { key: "customer_care", label: "Consumer Care & Helpline", rule: "Rule 2(l)" },
+      ]
+    }
+  ];
+
+  function renderScanResult(result) {
+    document.getElementById('score-ring-container').innerHTML = scoreRingHTML(result.compliance_score);
+    document.getElementById('score-status').innerHTML = complianceBadge(result.status);
+    document.getElementById('res-badge-status').innerHTML = complianceBadge(result.status);
+    document.getElementById('res-model-badge').textContent = result.model_used ? `Engine: ${result.model_used}` : 'AI Vision Engine';
+    document.getElementById('scan-product-name').textContent = result.product_name || 'Unidentified Packaged Commodity';
+    document.getElementById('scan-brand').textContent = result.brand ? `Brand: ${result.brand}` : '';
+
+    if (!editedFields.brand_name) {
+      editedFields.brand_name = result.brand || result.extracted_fields?.brand_name || result.extracted_fields?.brand || '—';
+    }
+
+    // Score explanation
+    const scoreExp = document.getElementById('score-explanation');
+    if (result.compliance_score >= 80) {
+      scoreExp.textContent = 'High compliance with statutory declarations under LM(PC)R 2011.';
+    } else if (result.compliance_score >= 50) {
+      scoreExp.textContent = 'Partial compliance. Specific mandatory declarations require rectification.';
+    } else {
+      scoreExp.textContent = 'Critical statutory violations detected. Liable under Section 36 of Legal Metrology Act, 2009.';
+    }
+
+    // Statutory summary and recommended legal action
+    const violations = result.violations || [];
+    const critCount = violations.filter(v => v.severity === 'critical').length;
+    const majCount = violations.filter(v => v.severity === 'major').length;
+    const minCount = violations.filter(v => v.severity === 'minor').length;
+
+    document.getElementById('violations-count-badge').textContent = violations.length;
+
+    let summaryText = `Label audit assessed against statutory declarations under Legal Metrology (Packaged Commodities) Rules, 2011. Found ${violations.length} non-compliances (${critCount} critical, ${majCount} major, ${minCount} advisory).`;
+    document.getElementById('statutory-summary-text').textContent = summaryText;
+
+    const actionBox = document.getElementById('recommended-action-box');
+    if (violations.length === 0) {
+      actionBox.className = 'notice notice-success';
+      actionBox.innerHTML = '<strong>Recommended Action:</strong> No enforcement action required. Packaging label satisfies statutory provisions.';
+    } else if (critCount > 0) {
+      actionBox.className = 'notice notice-error';
+      actionBox.innerHTML = '<strong>Recommended Action:</strong> Issue formal Notice under Section 18 of Legal Metrology Act, 2009 for compounding under Section 49 or compounding fees.';
+    } else {
+      actionBox.className = 'notice notice-warning';
+      actionBox.innerHTML = '<strong>Recommended Action:</strong> Issue Rectification Advisory to manufacturer/packer within 15 working days.';
+    }
+
+    // Render Tab 1: Statutory Fields
+    renderStatutoryFields();
+
+    // Render Tab 2: Violations
+    renderViolationsTab(violations);
+
+    // Render Tab 3: Raw OCR
+    const rawOcr = result.raw_ocr_text || result.extracted_text || 'No raw OCR transcription returned.';
+    document.getElementById('raw-ocr-display').textContent = rawOcr;
+  }
+
+  function renderStatutoryFields() {
+    const container = document.getElementById('statutory-fields-container');
+    const fields = editedFields || {};
+    const violations = currentScanResult?.violations || [];
+
+    let html = '';
+    STATUTORY_FIELD_GROUPS.forEach(group => {
+      html += `<div class="statutory-group-title">
+        <span>${group.group}</span>
+      </div>`;
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:10px;margin-bottom:12px;">';
+
+      group.fields.forEach(f => {
+        let val = fields[f.key];
+        if (!val || val === '—' || val === 'Not Declared / Not Found') {
+          if (f.key === 'brand_name') val = fields.brand || currentScanResult?.brand || fields.brand_name || '—';
+          else if (f.key === 'mfg_date') val = fields.mfr_date || fields.mfg_date || '—';
+          else if (f.key === 'expiry_date') val = fields.exp_date || fields.expiry_date || fields.best_before || '—';
+          else if (f.key === 'batch_number') val = fields.batch_no || fields.batch_number || '—';
+          else if (f.key === 'manufacturer_details') val = fields.manufacturer_details || fields.manufacturer_name || (fields.address ? (fields.manufacturer_name ? fields.manufacturer_name + ', ' + fields.address : fields.address) : '—');
+          else if (f.key === 'customer_care') val = fields.customer_care || '—';
+          else if (f.key === 'country_of_origin') val = fields.country_of_origin || '—';
+          else if (f.key === 'mrp') val = fields.mrp_raw || fields.mrp || '—';
+          else if (f.key === 'net_quantity') val = fields.net_quantity || '—';
+          else if (f.key === 'unit_sale_price') val = fields.unit_sale_price || '—';
+          else if (f.key === 'fssai_license') val = fields.fssai_license || fields.fssai_no || '—';
+          else val = '—';
+        }
+        const isViolated = violations.some(v => v.field === f.key || (f.key === 'mfg_date' && v.field === 'mfr_date') || (f.key === 'batch_number' && v.field === 'batch_no') || (f.key === 'manufacturer_details' && v.field === 'manufacturer_name') || (f.key === 'expiry_date' && (v.field === 'exp_date' || v.field === 'best_before')) || (f.key === 'customer_care' && v.field === 'customer_care'));
+        const violationObj = violations.find(v => v.field === f.key || (f.key === 'mfg_date' && v.field === 'mfr_date') || (f.key === 'batch_number' && v.field === 'batch_no') || (f.key === 'manufacturer_details' && v.field === 'manufacturer_name') || (f.key === 'expiry_date' && (v.field === 'exp_date' || v.field === 'best_before')) || (f.key === 'customer_care' && v.field === 'customer_care'));
+        const isEmpty = !val || val === '—' || val === 'Not Declared / Not Found';
+
+        html += `
+          <div class="field-audit-card ${isViolated ? 'violation-flagged' : ''}" id="field-card-${f.key}">
+            <div class="field-audit-header">
+              <span class="field-rule-pill">${f.rule}</span>
+              ${isViolated 
+                ? `<span class="badge badge-violation" style="font-size:10px;">⚠ ${violationObj?.severity || 'Violation'}</span>`
+                : (isEmpty ? `<span class="badge badge-warning" style="font-size:10px;">Missing</span>` : `<span class="badge badge-compliant" style="font-size:10px;">✓ Compliant</span>`)
+              }
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${f.label}</div>
+            <div class="field-audit-value" id="val-display-${f.key}">${val}</div>
+            <div id="val-edit-${f.key}" style="display:none;">
+              <input type="text" class="edit-field-input" id="input-${f.key}" value="${val === '—' ? '' : String(val).replace(/"/g, '&quot;')}" />
+              <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end;">
+                <button type="button" class="btn btn-amber btn-sm" onclick="saveFieldEdit('${f.key}')">Save</button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="cancelFieldEdit('${f.key}')">Cancel</button>
+              </div>
+            </div>
+            <div class="field-audit-actions">
+              <span style="font-size:10px;color:var(--text-muted);">${isViolated ? (violationObj?.rule_code || '') : ''}</span>
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 6px;" onclick="toggleEditField('${f.key}')">✏️ Edit</button>
+            </div>
+          </div>
+        `;
+      });
+      html += '</div>';
+    });
+
+    container.innerHTML = html;
+  }
+
+  function toggleEditField(key) {
+    const displayEl = document.getElementById(`val-display-${key}`);
+    const editEl = document.getElementById(`val-edit-${key}`);
+    if (!displayEl || !editEl) return;
+    const isEditing = editEl.style.display === 'block';
+    displayEl.style.display = isEditing ? 'block' : 'none';
+    editEl.style.display = isEditing ? 'none' : 'block';
+    if (!isEditing) {
+      document.getElementById(`input-${key}`).focus();
+    }
+  }
+
+  function cancelFieldEdit(key) {
+    document.getElementById(`val-display-${key}`).style.display = 'block';
+    document.getElementById(`val-edit-${key}`).style.display = 'none';
+  }
+
+  function saveFieldEdit(key) {
+    const input = document.getElementById(`input-${key}`);
+    const newVal = input.value.trim() || '—';
+    editedFields[key] = newVal;
+    document.getElementById(`val-display-${key}`).textContent = newVal;
+    document.getElementById(`val-display-${key}`).style.display = 'block';
+    document.getElementById(`val-edit-${key}`).style.display = 'none';
+    document.getElementById('recalc-btn').style.display = 'inline-flex';
+    showToast(`Updated ${key}. Click 'Recalculate Compliance' to re-evaluate.`, 'info');
+  }
+
+  async function recalculateFields() {
+    if (!currentScanResult) return;
+    const btn = document.getElementById('recalc-btn');
+    btn.disabled = true;
+    btn.textContent = 'Recalculating…';
+    try {
+      const reevaluated = await API.reevaluateScan(
+        editedFields,
+        currentScanResult.product_name,
+        currentScanResult.brand
+      );
+      currentScanResult = {
+        ...currentScanResult,
+        ...reevaluated,
+        extracted_fields: { ...editedFields },
+      };
+      renderScanResult(currentScanResult);
+      btn.style.display = 'none';
+      showToast('Compliance rules re-evaluated successfully!', 'success');
+    } catch (e) {
+      showToast('Re-evaluation failed: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔄 Recalculate Compliance';
+    }
+  }
+
+  function renderViolationsTab(violations) {
+    const vlist = document.getElementById('violations-list-container');
+    if (!violations || violations.length === 0) {
+      vlist.innerHTML = `
+        <div class="empty-state" style="padding:32px 16px;">
+          <div class="empty-icon" style="background:var(--compliant-bg);color:var(--compliant);">✓</div>
+          <div class="empty-title" style="color:var(--compliant);">Fully Compliant Label</div>
+          <div class="empty-desc">All mandatory statutory declarations under Legal Metrology (Packaged Commodities) Rules, 2011 are present and valid.</div>
+        </div>
+      `;
+      return;
+    }
+
+    vlist.innerHTML = violations.map((v, i) => `
+      <div class="violation-item" style="padding:14px 10px;">
+        <span class="violation-dot ${v.severity}" style="margin-top:4px;"></span>
+        <div class="violation-meta">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="violation-field" style="font-size:14px;">${v.field.replace(/_/g, ' ')}</span>
+            <span class="field-rule-pill">${v.rule_code || 'LM(PC)R 2011'}</span>
+            <span class="badge badge-${v.severity === 'critical' ? 'violation' : v.severity === 'major' ? 'warning' : 'compliant'}" style="text-transform:capitalize;font-size:10px;">
+              ${v.severity} non-compliance
+            </span>
+          </div>
+          <div style="font-size:13px;color:var(--text-base);margin-top:6px;font-weight:500;">
+            ${v.issue}
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-top:4px;">
+            Statutory Provision: ${v.legal_reference || 'Legal Metrology Act, 2009 — Section 18 read with Section 36'}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function switchInspectorTab(tabKey) {
+    const tabs = ['fields', 'violations', 'ocr'];
+    tabs.forEach(t => {
+      document.getElementById(`tab-content-${t}`).style.display = (t === tabKey) ? 'block' : 'none';
+      const btn = document.getElementById(`tab-btn-${t}`);
+      if (btn) {
+        if (t === tabKey) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+    });
+  }
+
+  function copyOcrText() {
+    const txt = document.getElementById('raw-ocr-display').textContent;
+    navigator.clipboard.writeText(txt).then(() => {
+      showToast('Verbatim OCR text copied to clipboard.', 'success');
+    }).catch(() => {
+      showToast('Could not copy text.', 'error');
+    });
+  }
+
+  // ── Statutory Inspection Notice Modal ───────────────
+  function openStatutoryNoticeModal() {
+    if (!currentScanResult) return showToast('Please scan a label first.', 'info');
+    const modal = document.getElementById('statutory-notice-modal');
+    const content = document.getElementById('notice-document-content');
+    const session = getSession();
+    const officerName = session ? (session.name || session.userId || 'Legal Metrology Officer') : 'Legal Metrology Officer';
+    const officerState = session?.state || 'National Capital Territory of Delhi';
+
+    const pName = currentScanResult.product_name || 'Packaged Commodity';
+    const mfg = editedFields.manufacturer_details || 'Manufacturer / Packer';
+    const violations = currentScanResult.violations || [];
+    const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    let violationsListMarkup = violations.length === 0 
+      ? '<p><em>No statutory non-compliances detected during this inspection.</em></p>'
+      : '<ol style="padding-left:20px;">' + violations.map(v => `
+          <li style="margin-bottom:8px;">
+            <strong>${v.rule_code} (${v.field.replace(/_/g, ' ')}):</strong> ${v.issue}
+            <div style="font-size:11px;color:#555;">Statutory Provision: Section 18 / Section 36(1) of Legal Metrology Act, 2009</div>
+          </li>
+        `).join('') + '</ol>';
+
+    content.innerHTML = `
+      <div style="text-align:center;border-bottom:2px solid #222;padding-bottom:12px;margin-bottom:16px;">
+        <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#555;">Government of India · Ministry of Consumer Affairs, Food &amp; Public Distribution</div>
+        <div style="font-size:16px;font-weight:bold;color:#111;margin-top:4px;">DEPARTMENT OF LEGAL METROLOGY</div>
+        <div style="font-size:12px;color:#444;">ENFORCEMENT WING · ${officerState.toUpperCase()}</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;margin-bottom:14px;font-size:12px;">
+        <div><strong>Notice Ref:</strong> PRISM/INSP/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}</div>
+        <div><strong>Date:</strong> ${dateStr}</div>
+      </div>
+
+      <div style="margin-bottom:12px;font-size:12px;">
+        <strong>To:</strong><br/>
+        The Managing Director / Authorized Signatory<br/>
+        ${mfg}
+      </div>
+
+      <div style="text-align:center;font-weight:bold;margin:14px 0;text-decoration:underline;font-size:13px;">
+        SUBJECT: NOTICE FOR DEFECTIVE PRE-PACKAGED COMMODITY DECLARATIONS UNDER SECTION 18 OF THE LEGAL METROLOGY ACT, 2009 READ WITH RULE 4, 6 &amp; 7 OF LM(PC)R 2011
+      </div>
+
+      <p>Sir / Madam,</p>
+      <p>During an enforcement inspection conducted on <strong>${dateStr}</strong>, packaging samples of commodity <strong>"${pName}"</strong> bearing barcode <strong>"${editedFields.barcode || '—'}"</strong> were analyzed using the Packaged Rules Inspection &amp; Scanning Mechanism (PRISM).</p>
+
+      <p>The label inspection revealed the following statutory violations:</p>
+      ${violationsListMarkup}
+
+      <p>Contravention of Section 18 of the Legal Metrology Act, 2009 is punishable under <strong>Section 36(1)</strong> of the said Act with a fine extending up to ₹25,000/- for the first offence, or prosecution under the relevant provisions.</p>
+
+      <p>You are hereby directed to submit your written explanation or compound the offence under Section 49 within fifteen (15) days of receipt of this notice.</p>
+
+      <div style="margin-top:30px;display:flex;justify-content:flex-end;">
+        <div style="text-align:center;min-width:200px;">
+          <div style="border-bottom:1px solid #333;width:160px;margin:0 auto 6px;"></div>
+          <strong>${officerName}</strong><br/>
+          <span style="font-size:11px;color:#555;">Inspector / Enforcement Officer<br/>Department of Legal Metrology</span>
+        </div>
+      </div>
+    `;
+
+    modal.style.display = 'flex';
+  }
+
+  function closeStatutoryNoticeModal() {
+    document.getElementById('statutory-notice-modal').style.display = 'none';
+  }
+
+  function copyNoticeText() {
+    const text = document.getElementById('notice-document-content').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Statutory notice text copied to clipboard.', 'success');
+    }).catch(() => {
+      showToast('Failed to copy notice.', 'error');
+    });
+  }
+
+  function printNoticeDocument() {
+    const printContents = document.getElementById('notice-document-content').innerHTML;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      return showToast('Popup blocked. Please allow popups to print notice.', 'error');
+    }
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Legal Metrology Enforcement Notice</title>
+          <style>
+            body { font-family: Georgia, serif; font-size: 13pt; line-height: 1.6; margin: 40px; color: #000; }
+            h2, h3 { text-align: center; }
+            ol { padding-left: 20px; }
+            li { margin-bottom: 8px; }
+          </style>
+        </head>
+        <body>
+          ${printContents}
+          <script>window.onload = function() { window.print(); window.close(); };<\/script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   }
 
   function filterProducts(q) {

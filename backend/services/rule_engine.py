@@ -77,218 +77,108 @@ class LMPCRuleEngine:
     # Valid MRP numeral (may include commas and decimal)
     MRP_VALUE_PATTERN = re.compile(r"^[\d,]+(?:\.\d{1,2})?$")
 
-    # Strict metric unit symbols for pre-press artwork (Rule 7(2) strictly mandates 'g', 'kg', 'ml', 'l')
-    STRICT_METRIC_INVALID_PATTERN = re.compile(
-        r"\d+\s*(?:gms|gm|g\.|kilos|ltr|ltrs|mls)\b",
-        re.IGNORECASE,
-    )
-
-    # Rule 6(10) Mandatory Declarations for E-Commerce Digital Listings
-    ECOMMERCE_MANDATORY_FIELDS: List[tuple] = [
-        ("manufacturer_name", "LMPC-R6(10)-MFR", "critical",
-         "Rule 6(10): Digital listing must prominently display name & complete address of the manufacturer, packer, or importer."),
-        ("net_quantity", "LMPC-R6(10)-NETQTY", "critical",
-         "Rule 6(10): Net quantity in standard metric units must be explicitly stated on the digital marketplace product page."),
-        ("mrp", "LMPC-R6(10)-MRP", "critical",
-         "Rule 6(10): Maximum Retail Price inclusive of all taxes must be declared on the digital listing prior to consumer purchase."),
-        ("country_of_origin", "LMPC-R6(10)-ORIGIN", "major",
-         "Rule 6(10) & Consumer Protection Rules 2020: Country of Origin must be displayed conspicuously on digital product listings."),
-        ("customer_care", "LMPC-R6(10)-CARE", "minor",
-         "Rule 6(10): Consumer care contact details (telephone number or e-mail address) must be displayed on product listing."),
-    ]
-
-    def run(
-        self,
-        fields: Dict[str, Any],
-        analysis: Dict[str, Any] | None = None,
-        state: str | None = None,
-        input_type: str = "physical_package",
-    ) -> Dict[str, Any]:
+    def run(self, fields: Dict[str, Any], analysis: Dict[str, Any] | None = None, state: str | None = None) -> Dict[str, Any]:
         """
-        Execute rule checks against *fields* according to inspection input_type:
-        - 'physical_package': On-pack declarations, physical image legibility, batch/mfr date.
-        - 'artwork_design': Pre-press artwork proofs, PDP font sizes, strict metric symbols ('g'/'ml'), contrast.
-        - 'ecommerce_listing': Rule 6(10) digital marketplace declarations, seller disclosure, country of origin.
+        Execute all rule checks against *fields* (dict from OCR / form data).
+        Applies state-specific rule threshold values if set for the jurisdiction.
+
+        Returns
+        -------
+        dict with keys:
+            violations       : list of dicts (one per rule violation)
+            compliance_score : int 0-100
+            compliance_result: "compliant" | "partial" | "violation"
+            summary          : dict with counts
         """
         violations: List[RuleViolation] = []
         analysis = analysis or {}
-        input_type = (input_type or "physical_package").lower()
 
         # ------------------------------------------------------------------
-        # E-Commerce Product Listing Inspection (Rule 6(10))
+        # 1. Mandatory field presence
         # ------------------------------------------------------------------
-        if input_type == "ecommerce_listing":
-            for field, rule_code, severity, explanation in self.ECOMMERCE_MANDATORY_FIELDS:
-                value = fields.get(field, "")
-                if not value or not str(value).strip():
-                    violations.append(
-                        RuleViolation(
-                            rule_code=rule_code,
-                            field=field,
-                            issue=f"Digital listing missing mandatory {field.replace('_', ' ')} under Rule 6(10)",
-                            severity=severity,
-                            explanation=explanation,
-                        )
-                    )
-
-            # Check net quantity format on e-commerce listing
-            nq = str(fields.get("net_quantity", "")).strip()
-            if nq and not self.METRIC_UNITS_PATTERN.search(nq):
+        for field, rule_code, severity in self.MANDATORY_FIELDS:
+            value = fields.get(field, "")
+            if not value or not str(value).strip():
                 violations.append(
                     RuleViolation(
-                        rule_code="LMPC-R6(10)-UNITS",
-                        field="net_quantity",
-                        issue="E-commerce net quantity not stated in standard metric units (kg/g/l/ml)",
-                        severity="major",
-                        explanation="Rule 6(10) & Rule 7(2): Digital listings must state net content using standard metric units.",
+                        rule_code=rule_code,
+                        field=field,
+                        issue=f"{field.replace('_', ' ').title()} not found on label",
+                        severity=severity,
+                        explanation=self.EXPLANATIONS.get(field, ""),
                     )
                 )
 
-            # Check MRP format
-            mrp = str(fields.get("mrp", "")).strip()
-            if mrp and not self.MRP_VALUE_PATTERN.match(mrp.replace(" ", "").replace("₹", "").replace("Rs", "").replace("Rs.", "")):
-                violations.append(
-                    RuleViolation(
-                        rule_code="LMPC-R6(10)-PRICE",
-                        field="mrp",
-                        issue="E-commerce listing price format ambiguous or invalid",
-                        severity="major",
-                        explanation="Rule 6(10): Digital price must clearly indicate MRP inclusive of all taxes.",
-                    )
-                )
-
-            total_checks = len(self.ECOMMERCE_MANDATORY_FIELDS) + 2
-
         # ------------------------------------------------------------------
-        # Packaging Artwork / Design File Inspection (Pre-Press Verification)
+        # 2. Net quantity must be in metric units  — Rule 7(2)
         # ------------------------------------------------------------------
-        elif input_type == "artwork_design":
-            # Check mandatory declarations for packaging artwork proofs
-            for field, rule_code, severity in self.MANDATORY_FIELDS:
-                value = fields.get(field, "")
-                # On artwork proofs, batch number and mfr date are often placeholder keylines like "BATCH: B### MFD: MM/YY"
-                if field in ("batch_no", "mfr_date"):
-                    if not value or not str(value).strip():
-                        violations.append(
-                            RuleViolation(
-                                rule_code=rule_code,
-                                field=field,
-                                issue=f"Packaging artwork missing placeholder/keyline for {field.replace('_', ' ')}",
-                                severity="minor",
-                                explanation=f"Pre-print proof must allocate clear print window/keyline for {field.replace('_', ' ')} under Rule 6.",
-                            )
-                        )
-                    continue
-
-                if not value or not str(value).strip():
-                    violations.append(
-                        RuleViolation(
-                            rule_code=rule_code,
-                            field=field,
-                            issue=f"Packaging artwork missing mandatory {field.replace('_', ' ')} on layout",
-                            severity=severity,
-                            explanation=self.EXPLANATIONS.get(field, ""),
-                        )
-                    )
-
-            # Pre-press typography & unit symbol check: e.g. 'gms' is strictly forbidden under Rule 7(2)
-            nq = str(fields.get("net_quantity", "")).strip()
-            if nq:
-                if self.STRICT_METRIC_INVALID_PATTERN.search(nq):
-                    violations.append(
-                        RuleViolation(
-                            rule_code="LMPC-ARTWORK-R7(2)",
-                            field="net_quantity",
-                            issue="Non-standard metric symbol on artwork (use 'g' or 'kg', not 'gm' / 'gms')",
-                            severity="major",
-                            explanation="Rule 7(2) Pre-Press: The abbreviations 'gm', 'gms', 'ltr', 'mls' are non-compliant. Only standard symbols 'g', 'kg', 'l', 'ml' are permissible.",
-                        )
-                    )
-                elif not self.METRIC_UNITS_PATTERN.search(nq):
-                    violations.append(
-                        RuleViolation(
-                            rule_code="LMPC-R7(2)",
-                            field="net_quantity",
-                            issue="Net quantity not expressed in standard metric units on artwork",
-                            severity="major",
-                            explanation="Rule 7(2): Net quantity must use metric units on the artwork layout.",
-                        )
-                    )
-
-            # Check MRP declaration wording on artwork proof
-            mrp_text = str(fields.get("mrp", "")).lower()
-            if mrp_text and "incl" not in mrp_text and "tax" not in mrp_text and not fields.get("mrp_inclusive_taxes", True):
-                violations.append(
-                    RuleViolation(
-                        rule_code="LMPC-ARTWORK-R4",
-                        field="mrp",
-                        issue="Artwork MRP block missing mandatory 'incl. of all taxes' declaration",
-                        severity="major",
-                        explanation="Rule 4(1): Pre-press artwork must explicitly include the words 'inclusive of all taxes' or 'incl. of all taxes'.",
-                    )
-                )
-
-            total_checks = len(self.MANDATORY_FIELDS) + 2
-
-        # ------------------------------------------------------------------
-        # Physical Package Image Inspection (Standard Physical Label)
-        # ------------------------------------------------------------------
-        else:
-            for field, rule_code, severity in self.MANDATORY_FIELDS:
-                value = fields.get(field, "")
-                if not value or not str(value).strip():
-                    violations.append(
-                        RuleViolation(
-                            rule_code=rule_code,
-                            field=field,
-                            issue=f"{field.replace('_', ' ').title()} not found on physical label",
-                            severity=severity,
-                            explanation=self.EXPLANATIONS.get(field, ""),
-                        )
-                    )
-
-            nq = str(fields.get("net_quantity", "")).strip()
-            if nq and not self.METRIC_UNITS_PATTERN.search(nq):
-                violations.append(
-                    RuleViolation(
-                        rule_code="LMPC-R7(2)",
-                        field="net_quantity",
-                        issue="Net quantity not expressed in standard metric units (kg/g/l/ml)",
-                        severity="major",
-                        explanation=(
-                            "Rule 7(2): Net quantity must be declared in the metric "
-                            "system — kilograms (kg), grams (g), litres (l), or "
-                            "millilitres (ml) as applicable."
-                        ),
-                    )
-                )
-
-            mrp = str(fields.get("mrp", "")).strip()
-            if mrp and not self.MRP_VALUE_PATTERN.match(mrp.replace(" ", "").replace("₹", "").replace("Rs", "").replace("Rs.", "")):
-                violations.append(
-                    RuleViolation(
-                        rule_code="LMPC-R4(2)",
-                        field="mrp",
-                        issue="MRP value is not a valid numeral or is illegible",
-                        severity="major",
-                        explanation=(
-                            "Rule 4(2): MRP must be stated as a numeral inclusive of "
-                            "all taxes; it must be clearly legible."
-                        ),
-                    )
-                )
-
-            readability = float(analysis.get("readability_score", 0))
-            text_height = int(analysis.get("median_text_height_px", 0))
-            if readability < 55 or text_height < 8:
-                violations.append(RuleViolation(
-                    rule_code="LMPC-READABILITY", field="label_readability",
-                    issue="Label declarations are not reliably legible in the submitted image",
+        nq = str(fields.get("net_quantity", "")).strip()
+        if nq and not self.METRIC_UNITS_PATTERN.search(nq):
+            violations.append(
+                RuleViolation(
+                    rule_code="LMPC-R7(2)",
+                    field="net_quantity",
+                    issue="Net quantity not expressed in standard metric units (kg/g/l/ml)",
                     severity="major",
-                    explanation="Mandatory declarations must be conspicuous and legible. Retake a sharp, front-facing image or use larger label text.",
-                ))
+                    explanation=(
+                        "Rule 7(2): Net quantity must be declared in the metric "
+                        "system — kilograms (kg), grams (g), litres (l), or "
+                        "millilitres (ml) as applicable."
+                    ),
+                )
+            )
 
-            total_checks = len(self.MANDATORY_FIELDS) + 3
+        # ------------------------------------------------------------------
+        # 3. MRP must be a valid numeral  — Rule 4(2)
+        # ------------------------------------------------------------------
+        mrp = str(fields.get("mrp", "")).strip()
+        if mrp and not self.MRP_VALUE_PATTERN.match(mrp.replace(" ", "")):
+            violations.append(
+                RuleViolation(
+                    rule_code="LMPC-R4(2)",
+                    field="mrp",
+                    issue="MRP value is not a valid numeral or is illegible",
+                    severity="major",
+                    explanation=(
+                        "Rule 4(2): MRP must be stated as a numeral inclusive of "
+                        "all taxes; it must be clearly legible."
+                    ),
+                )
+            )
+
+        # ------------------------------------------------------------------
+        # 4. FSSAI licence number (14-digit) for food items  — FSS Act
+        #    Treat as a minor advisory when detected as present but malformed.
+        # ------------------------------------------------------------------
+        fssai = str(fields.get("fssai_no", "")).strip()
+        if fssai and not re.fullmatch(r"[0-9]{14}", fssai):
+            violations.append(
+                RuleViolation(
+                    rule_code="FSSAI-LIC",
+                    field="fssai_no",
+                    issue="FSSAI licence number detected but does not match 14-digit format",
+                    severity="minor",
+                    explanation=(
+                        "FSSAI Licence Number must be exactly 14 digits as per "
+                        "Food Safety and Standards Act, 2006."
+                    ),
+                )
+            )
+
+        readability = float(analysis.get("readability_score", 0))
+        text_height = int(analysis.get("median_text_height_px", 0))
+        if readability < 55 or text_height < 8:
+            violations.append(RuleViolation(
+                rule_code="LMPC-READABILITY", field="label_readability",
+                issue="Label declarations are not reliably legible in the submitted image",
+                severity="major",
+                explanation="Mandatory declarations must be conspicuous and legible. Retake a sharp, front-facing image or use larger label text.",
+            ))
+        # ------------------------------------------------------------------
+        # 5. Score computation
+        # ------------------------------------------------------------------
+        #  Total possible checks = mandatory fields + 3 format checks
+        total_checks = len(self.MANDATORY_FIELDS) + 3
 
         critical_count = sum(1 for v in violations if v.severity == "critical")
         major_count = sum(1 for v in violations if v.severity == "major")
@@ -328,14 +218,12 @@ class LMPCRuleEngine:
             status = "violation"
 
         return {
-            "input_type": input_type,
             "violations": [asdict(v) for v in violations],
             "compliance_score": score,
             "compliance_result": status,
-            "artwork_clearance": "ready_for_print" if (critical_count == 0 and major_count == 0) else "revision_required",
             "summary": {
                 "total_checks": total_checks,
-                "passed": max(0, total_checks - len(violations)),
+                "passed": total_checks - len(violations),
                 "failed": len(violations),
                 "critical": critical_count,
                 "major": major_count,
